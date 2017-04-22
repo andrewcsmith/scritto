@@ -2,10 +2,12 @@
 //! point in time that passes through the program will need to implement `Note` in some form, while
 //! `Pitch` is specific to translating the onset of the `Note` into text.
 
-trait Note {
+use super::{Duration, Durational, Pitch, IntegerDuration, RatioDuration};
+
+trait Note<D: Durational> {
     /// Duration of the `Note` should be given as a ratio tuple. This is to facilitate working with
     /// metrical divisions, including potential tuplets.
-    fn duration(&self) -> (u32, u32);
+    fn duration(&self) -> Duration<D>;
 
     /// Text of the beginning of the note (excluding duration), which will be passed on to the
     /// given template. This appears at the start of the Note and is repeated as necessary
@@ -17,16 +19,6 @@ trait Note {
     fn annotations(&self) -> &str {
         &""
     }
-}
-
-/// Responsible in many of the in-house stock cases for translating the onset of the `Note` into
-/// text. This includes 12-tone equal tempered pitches (which are provided) as well as rational
-/// pitches that take the form of the Helmholtz-Ellis accidentals as written in the Lilypond HE
-/// library created by Andrew C. Smith.
-trait Pitch {
-    /// The only required method is one which translates the starting pitch to a note name of some
-    /// sort, needed for the start of each `Note`.
-    fn pitch(&self) -> String;
 }
 
 /// On the incomprehensible reason you would want to use equal temperament, this quicky is provided
@@ -53,13 +45,13 @@ impl From<u32> for ETPitch {
     }
 }
 
-struct SingleNote<P: Pitch> {
-    duration: Option<(u32, u32)>,
+struct SingleNote<P: Pitch, D: Durational> {
+    duration: Option<Duration<D>>,
     pitch: P 
 }
 
-impl<P: Pitch> SingleNote<P> {
-    fn new<IntoP: Into<P>, T: Into<Option<(u32, u32)>>>(pitch: IntoP, duration: T) -> Self {
+impl<P: Pitch, D: Durational> SingleNote<P, D> {
+    fn new<IntoP: Into<P>, T: Into<Option<Duration<D>>>>(pitch: IntoP, duration: T) -> Self {
         Self {
             duration: duration.into(),
             pitch: pitch.into()
@@ -67,9 +59,9 @@ impl<P: Pitch> SingleNote<P> {
     }
 }
 
-impl<P: Pitch> Note for SingleNote<P> {
-    fn duration(&self) -> (u32, u32) {
-        self.duration.unwrap_or((1, 1))
+impl<P: Pitch, D: Durational> Note<D> for SingleNote<P, D> {
+    fn duration(&self) -> Duration<D> {
+        self.duration.unwrap_or(Duration::<D>::new(1, 1))
     }
 
     fn text(&self) -> String {
@@ -77,13 +69,13 @@ impl<P: Pitch> Note for SingleNote<P> {
     }
 }
 
-struct Chord<P: Pitch> {
-    duration: Option<(u32, u32)>,
+struct Chord<P: Pitch, D: Durational> {
+    duration: Option<Duration<D>>,
     pitches: Vec<P>
 }
 
-impl<P: Pitch> Chord<P> {
-    fn new<T: Into<Option<(u32, u32)>>>(pitches: Vec<P>, duration: T) -> Self {
+impl<P: Pitch, D: Durational> Chord<P, D> {
+    fn new<T: Into<Option<Duration<D>>>>(pitches: Vec<P>, duration: T) -> Self {
         Self {
             duration: duration.into(),
             pitches: pitches
@@ -91,9 +83,9 @@ impl<P: Pitch> Chord<P> {
     }
 }
 
-impl<P: Pitch> Note for Chord<P> {
-    fn duration(&self) -> (u32, u32) {
-        self.duration.unwrap_or((1, 1))
+impl<P: Pitch, D: Durational> Note<D> for Chord<P, D> {
+    fn duration(&self) -> Duration<D> {
+        self.duration.unwrap_or(Duration::<D>::new(1, 1))
     }
 
     fn text(&self) -> String {
@@ -124,26 +116,26 @@ mod tests {
 
     #[test]
     fn gets_single_note_name() {
-        let note = SingleNote::<ETPitch>::new(ETPitch(62), None);
+        let note = SingleNote::<ETPitch, IntegerDuration>::new(ETPitch(62), None);
         assert_eq!(note.text().as_str(), "d");
     }
 
     #[test]
     fn gets_chord_name() {
-        let chord = Chord::<ETPitch>::new(vec![ETPitch(60), ETPitch(64), ETPitch(67)], None);
+        let chord = Chord::<ETPitch, IntegerDuration>::new(vec![ETPitch(60), ETPitch(64), ETPitch(67)], None);
         assert_eq!(chord.text().as_str(), "<c e g>");
     }
 
     #[test]
     fn one_note_chord() {
-        let chord = Chord::new(vec![ETPitch(60)], None);
+        let chord = Chord::<_, IntegerDuration>::new(vec![ETPitch(60)], None);
         assert_eq!(chord.text().as_str(), "<c>");
     }
 
     #[test]
     #[should_panic]
     fn panic_on_empty_chord() {
-        let chord = Chord::<ETPitch>::new(vec![], None);
+        let chord = Chord::<ETPitch, IntegerDuration>::new(vec![], None);
         chord.text().as_str();
     }
 }
