@@ -50,7 +50,46 @@ impl<D: Durational> GroupingController<D> {
         })
     }
 
-    fn consume_time(&mut self, mut time: Duration<D>) -> Result<(), &str> {
+    pub fn format_note<N: Note<D> + Clone>(&mut self, note: N) -> Result<String, &'static str> {
+        let mut dur = note.duration();
+        let count_left = self.count_left;
+
+        if count_left.as_float() < dur.as_float() {
+            let mut out = format!("{}{}{} ~ ", note.text(), self.count_left.as_lilypond(), note.annotations());
+            dur = dur - self.count_left;
+
+            let left = self.count_left;
+            self.consume_time(left)?;
+
+            let left = self.count_left;
+            while left.as_float() < dur.as_float() {
+                out.push_str(format!("{}{}", note.text(), self.count_left.as_lilypond()).as_str());
+                dur = dur - self.count_left;
+                let left = self.count_left;
+                self.consume_time(left)?;
+                if dur.as_float() > 0.0 {
+                    out.push_str(" ~ ");
+                }
+            }
+
+            if dur.as_float() > 0.0 {
+                out.push_str(format!("{}{}", note.text(), self.count_left.as_lilypond()).as_str());
+            }
+
+            Ok(out)
+        } else {
+            self.consume_time(dur)?;
+            Ok(format!("{}{}{}", note.text(), dur.as_lilypond(), note.annotations()))
+        }
+    }
+
+    pub fn format_notes<N: Note<D> + Clone>(&mut self, notes: Vec<N>) -> Result<String, &'static str> {
+        Ok(notes.into_iter()
+            .map(|n| self.format_note(n).unwrap())
+            .collect::<Vec<String>>().join(" "))
+    }
+
+    fn consume_time(&mut self, mut time: Duration<D>) -> Result<(), &'static str> {
         while time.as_float() > 0.0 {
             if self.count_left.as_float() < time.as_float() {
                 time = time - self.count_left;

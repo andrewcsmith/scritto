@@ -166,4 +166,37 @@ mod tests {
         let dur = Duration(RatioDuration(1, 4));
         assert_eq!(dur.as_float(), 0.25);
     }
+
+    fn initialize_notes() -> Vec<SingleNote<ETPitch, RatioDuration>> {
+        vec![
+            SingleNote::new(ETPitch(60), Duration(RatioDuration(1, 2))),
+            SingleNote::new(ETPitch(62), Duration(RatioDuration(1, 4))),
+            SingleNote::new(ETPitch(64), Duration(RatioDuration(1, 4)))
+        ]
+    }
+
+    fn initialize_groupings() -> Vec<Box<Grouping<RatioDuration>>> {
+        vec![
+            Box::new(Beat::new_ratio(1, 4)),
+            Box::new(Beat::new_ratio(1, 4)),
+            Box::new(Beat::new_ratio(1, 4)),
+            Box::new(Beat::new_ratio(1, 4))
+        ]
+    }
+
+    #[test]
+    fn test_format_note() {
+        let notes = initialize_notes();
+        let groupings = initialize_groupings();
+        let mut controller = GroupingController::new(Box::new(groupings.into_iter())).unwrap();
+        assert_eq!(Ok("c4 ~ c4".to_string()), controller.format_note(notes[0].clone()));
+    }
+
+    #[test]
+    fn test_format_notes() {
+        let notes = initialize_notes();
+        let groupings = initialize_groupings();
+        let mut controller = GroupingController::new(Box::new(groupings.into_iter())).unwrap();
+        assert_eq!(Ok("c4 ~ c4 d4 e4".to_string()), controller.format_notes(notes));
+    }
 }
