@@ -3,10 +3,10 @@
 //! trait, which allows for generalization over various types of groupings, and the possibility for
 //! `Note` values to overflow one grouping or another.
 
-use super::{Duration, Durational, Pitch};
+use super::{Duration, Durational, Pitch, Note};
 
 /// Primary trait of a given hierarchical level. 
-trait Grouping<D: Durational> {
+pub trait Grouping<D: Durational> {
     fn duration(&self) -> Duration<D>;
     fn start_annotation(&self) -> &str { "" } 
     fn end_annotation(&self) -> &str { "" }

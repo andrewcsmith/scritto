@@ -1,7 +1,9 @@
-mod notes;
-mod sequenza;
+pub mod notes;
+pub mod sequenza;
 
 use std::ops::Sub;
+
+pub use notes::Note;
 
 /// Trait for something that can represent duration. In the future, it may be wise to avoid making
 /// the `new` function necessary to allow other potentials for duration.
@@ -20,7 +22,7 @@ pub trait Durational: Sized + Copy {
 /// implementation of `std::ops` traits to make it easier to write generic code over various
 /// `Durational` types.
 #[derive(Copy, Clone, Debug, PartialEq)]
-struct Duration<D: Durational>(D);
+pub struct Duration<D: Durational>(pub D);
 
 impl<D: Durational> Sub for Duration<D> {
     type Output = Self;
@@ -67,7 +69,7 @@ impl Durational for IntegerDuration {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-struct RatioDuration(u32, u32);
+struct RatioDuration(pub u32, pub u32);
 
 impl Durational for RatioDuration {
     fn new(n: u32, d: u32) -> RatioDuration {
@@ -107,6 +109,8 @@ pub trait Pitch {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::notes::*;
+    use super::sequenza::*;
 
     #[test]
     fn subtract_duration() {

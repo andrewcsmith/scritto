@@ -4,7 +4,7 @@
 
 use super::{Duration, Durational, Pitch, IntegerDuration, RatioDuration};
 
-trait Note<D: Durational> {
+pub trait Note<D: Durational> {
     /// Duration of the `Note` should be given as a ratio tuple. This is to facilitate working with
     /// metrical divisions, including potential tuplets.
     fn duration(&self) -> Duration<D>;
@@ -23,12 +23,13 @@ trait Note<D: Durational> {
 
 /// On the incomprehensible reason you would want to use equal temperament, this quicky is provided
 /// to translate midi note values into easy chord names.
-struct ETPitch(u32);
+#[derive(Clone, Copy)]
+pub struct ETPitch(pub u32);
 
 static ET_SCALE: [&str; 12] = ["c", "csharp", "d", "eflat", "e", "f", "fsharp", "g", "gsharp", "a", "bflat", "b"];
 
 impl ETPitch {
-    fn new(midi_value: u32) -> Self {
+    pub fn new(midi_value: u32) -> Self {
         ETPitch(midi_value)
     }
 }
@@ -45,13 +46,14 @@ impl From<u32> for ETPitch {
     }
 }
 
-struct SingleNote<P: Pitch, D: Durational> {
+#[derive(Clone)]
+pub struct SingleNote<P: Pitch, D: Durational> {
     duration: Option<Duration<D>>,
     pitch: P 
 }
 
 impl<P: Pitch, D: Durational> SingleNote<P, D> {
-    fn new<IntoP: Into<P>, T: Into<Option<Duration<D>>>>(pitch: IntoP, duration: T) -> Self {
+    pub fn new<IntoP: Into<P>, T: Into<Option<Duration<D>>>>(pitch: IntoP, duration: T) -> Self {
         Self {
             duration: duration.into(),
             pitch: pitch.into()
