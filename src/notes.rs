@@ -71,19 +71,19 @@ impl<P: Pitch, D: Durational> Note<D> for SingleNote<P, D> {
     }
 }
 
-struct Chord<P: Pitch, D: Durational> {
+pub struct Chord<P: Pitch, D: Durational> {
     duration: Option<Duration<D>>,
     pitches: Vec<P>
 }
 
-impl<P: Pitch, D: Durational> Chord<P, D> {
-    fn new<T: Into<Option<Duration<D>>>>(pitches: Vec<P>, duration: T) -> Self {
-        Self {
-            duration: duration.into(),
-            pitches: pitches
+    impl<P: Pitch, D: Durational> Chord<P, D> {
+        pub fn new<U: Into<Vec<P>>, T: Into<Option<Duration<D>>>>(pitches: U, duration: T) -> Self {
+            Self {
+                duration: duration.into(),
+                pitches: pitches.into()
+            }
         }
     }
-}
 
 impl<P: Pitch, D: Durational> Note<D> for Chord<P, D> {
     fn duration(&self) -> Duration<D> {
@@ -130,7 +130,7 @@ mod tests {
 
     #[test]
     fn one_note_chord() {
-        let chord = Chord::<_, IntegerDuration>::new(vec![ETPitch(60)], None);
+        let chord = Chord::<ETPitch, IntegerDuration>::new(vec![ETPitch(60)], None);
         assert_eq!(chord.text().as_str(), "<c>");
     }
 
