@@ -15,6 +15,10 @@ pub trait Durational: Sized + Copy {
         let ratio = self.as_ratio();
         ratio.0 as f64 / ratio.1 as f64
     }
+
+    fn as_lilypond(&self) -> String {
+        String::new()
+    }
 }
 
 /// Wrapper for any struct implementing `Durational`, which is necessary in order to avoid the
@@ -53,6 +57,20 @@ impl<D: Durational> Durational for Duration<D> {
     fn as_ratio(&self) -> (u32, u32) {
         self.0.as_ratio()
     }
+
+    fn as_float(&self) -> f64 {
+        self.0.as_float()
+    }
+
+    fn as_lilypond(&self) -> String {
+        self.0.as_lilypond()
+    }
+}
+
+impl<D: Durational> From<D> for Duration<D> {
+    fn from(d: D) -> Self {
+        Duration(d)
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -78,6 +96,13 @@ impl Durational for RatioDuration {
 
     fn as_ratio(&self) -> (u32, u32) {
         (self.0, self.1)
+    }
+
+    fn as_lilypond(&self) -> String {
+        match self.as_ratio() {
+            (1, x) if x.is_power_of_two() => { x.to_string() }
+            _ => { panic!() }
+        }
     }
 }
 
