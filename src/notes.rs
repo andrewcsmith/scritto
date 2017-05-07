@@ -3,6 +3,7 @@
 //! `Pitch` is specific to translating the onset of the `Note` into text.
 
 use super::{Duration, Durational, Pitch};
+use serde::ser::{Serialize, Serializer, SerializeStruct};
 
 pub trait Note<D: Durational> {
     /// Duration of the `Note` should be given as a ratio tuple. This is to facilitate working with
@@ -68,6 +69,24 @@ impl<P: Pitch, D: Durational> Note<D> for SingleNote<P, D> {
 
     fn text(&self) -> String {
         self.pitch.pitch()
+    }
+}
+
+impl<P: Pitch, D: Durational> Serialize for SingleNote<P, D> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut s = serializer.serialize_struct("SingleNote", 2)?;
+        s.serialize_field("text", &self.text())?;
+        s.serialize_field("duration", &self.duration())?;
+        s.end()
+    }
+}
+
+impl<P: Pitch, D: Durational> Serialize for Chord<P, D> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut s = serializer.serialize_struct("SingleNote", 2)?;
+        s.serialize_field("text", &self.text())?;
+        s.serialize_field("duration", &self.duration())?;
+        s.end()
     }
 }
 
