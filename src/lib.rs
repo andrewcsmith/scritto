@@ -1,9 +1,10 @@
 pub mod notes;
 pub mod sequenza;
 
-use std::ops::Sub;
+use std::ops::{Add, Sub};
 
 pub use notes::Note;
+pub use sequenza::Grouping;
 
 /// Trait for something that can represent duration. In the future, it may be wise to avoid making
 /// the `new` function necessary to allow other potentials for duration.
@@ -42,6 +43,27 @@ impl<D: Durational> Sub for Duration<D> {
         other.0 *= r2_scale;
         other.1 *= r2_scale;
         ratio.0 -= other.0;
+        let least = gcd(ratio.0, ratio.1);
+        ratio.0 /= least;
+        ratio.1 /= least;
+        Duration(D::new(ratio.0, ratio.1))
+    }
+}
+
+impl<D: Durational> Add for Duration<D> {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        let mut ratio = self.as_ratio();
+        let mut other = other.as_ratio();
+        let mult = lcm(ratio.1, other.1);
+        let r1_scale = mult / ratio.1;
+        let r2_scale = mult / other.1;
+        ratio.0 *= r1_scale;
+        ratio.1 *= r1_scale;
+        other.0 *= r2_scale;
+        other.1 *= r2_scale;
+        ratio.0 += other.0;
         let least = gcd(ratio.0, ratio.1);
         ratio.0 /= least;
         ratio.1 /= least;
@@ -180,6 +202,10 @@ mod tests {
             Box::new(Beat::new_ratio(1, 4)),
             Box::new(Beat::new_ratio(1, 4)),
             Box::new(Beat::new_ratio(1, 4)),
+            Box::new(Beat::new_ratio(1, 4)),
+            Box::new(Beat::new_ratio(1, 4)),
+            Box::new(Beat::new_ratio(1, 4)),
+            Box::new(Beat::new_ratio(1, 4)),
             Box::new(Beat::new_ratio(1, 4))
         ]
     }
@@ -193,10 +219,47 @@ mod tests {
     }
 
     #[test]
+    fn test_format_notes_across_many_groupings() {
+        let notes: Vec<SingleNote<ETPitch, RatioDuration>> = vec![
+            SingleNote::new(ETPitch(60), Duration(RatioDuration(1, 1))),
+            SingleNote::new(ETPitch(62), Duration(RatioDuration(1, 4))),
+            SingleNote::new(ETPitch(64), Duration(RatioDuration(1, 4)))
+        ];
+        let groupings = initialize_groupings();
+        let mut controller = GroupingController::new(Box::new(groupings.into_iter())).unwrap();
+        assert_eq!(Ok("c4 ~ c4 ~ c4 ~ c4 d4 e4".to_string()), controller.format_notes(notes));
+    }
+
+    #[test]
     fn test_format_notes() {
         let notes = initialize_notes();
         let groupings = initialize_groupings();
         let mut controller = GroupingController::new(Box::new(groupings.into_iter())).unwrap();
         assert_eq!(Ok("c4 ~ c4 d4 e4".to_string()), controller.format_notes(notes));
+    }
+
+    #[test]
+    fn test_format_measure() {
+        let notes = initialize_notes();
+        let groupings: Vec<Box<Grouping<RatioDuration>>> = vec![
+            Box::new(
+                Measure::from_contents(
+                    vec![
+                        Box::new(Beat::new_ratio(1, 4)),
+                        Box::new(Beat::new_ratio(1, 4)),
+                        Box::new(Beat::new_ratio(1, 4))
+                    ])
+            ),
+            Box::new(
+                Measure::from_contents(
+                    vec![
+                        Box::new(Beat::new_ratio(1, 4)),
+                        Box::new(Beat::new_ratio(1, 4)),
+                        Box::new(Beat::new_ratio(1, 4))
+                    ])
+                )
+        ];
+        let mut controller = GroupingController::new(Box::new(groupings.into_iter())).unwrap();
+        assert_eq!(Ok(" %m. \n c4 ~ c4 d4  |\n %m. \n e4".to_string()), controller.format_notes(notes));
     }
 }

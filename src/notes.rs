@@ -2,7 +2,7 @@
 //! point in time that passes through the program will need to implement `Note` in some form, while
 //! `Pitch` is specific to translating the onset of the `Note` into text.
 
-use super::{Duration, Durational, Pitch, IntegerDuration, RatioDuration};
+use super::{Duration, Durational, Pitch};
 
 pub trait Note<D: Durational> {
     /// Duration of the `Note` should be given as a ratio tuple. This is to facilitate working with
@@ -76,14 +76,14 @@ pub struct Chord<P: Pitch, D: Durational> {
     pitches: Vec<P>
 }
 
-    impl<P: Pitch, D: Durational> Chord<P, D> {
-        pub fn new<U: Into<Vec<P>>, T: Into<Option<Duration<D>>>>(pitches: U, duration: T) -> Self {
-            Self {
-                duration: duration.into(),
-                pitches: pitches.into()
-            }
+impl<P: Pitch, D: Durational> Chord<P, D> {
+    pub fn new<U: Into<Vec<P>>, T: Into<Option<Duration<D>>>>(pitches: U, duration: T) -> Self {
+        Self {
+            duration: duration.into(),
+            pitches: pitches.into()
         }
     }
+}
 
 impl<P: Pitch, D: Durational> Note<D> for Chord<P, D> {
     fn duration(&self) -> Duration<D> {
@@ -109,6 +109,7 @@ impl<P: Pitch, D: Durational> Note<D> for Chord<P, D> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::{IntegerDuration, RatioDuration};
 
     #[test]
     fn translates_midi_to_note_name() {
