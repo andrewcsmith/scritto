@@ -230,49 +230,4 @@ mod tests {
         let dur = Duration(RatioDuration(3, 4));
         assert_eq!(dur.as_lilypond(), "4.");
     }
-
-    // #[test]
-    // fn test_format_notes_across_many_groupings() {
-    //     let notes: Vec<SingleNote<ETPitch, RatioDuration>> = vec![
-    //         SingleNote::new(ETPitch(60), Duration(RatioDuration(1, 1))),
-    //         SingleNote::new(ETPitch(62), Duration(RatioDuration(1, 4))),
-    //         SingleNote::new(ETPitch(64), Duration(RatioDuration(1, 4)))
-    //     ];
-    //     let groupings = initialize_groupings();
-    //     let mut controller = GroupingController::new(Box::new(groupings.into_iter())).unwrap();
-    //     assert_eq!(Ok("c4 ~ c4 ~ c4 ~ c4 d4 e4".to_string()), controller.format_notes(notes));
-    // }
-    //
-    // #[test]
-    // fn test_format_notes() {
-    //     let notes = initialize_notes();
-    //     let groupings = initialize_groupings();
-    //     let mut controller = GroupingController::new(Box::new(groupings.into_iter())).unwrap();
-    //     assert_eq!(Ok("c4 ~ c4 d4 e4".to_string()), controller.format_notes(notes));
-    // }
-    //
-    // #[test]
-    // fn test_format_measure() {
-    //     let notes = initialize_notes();
-    //     let groupings: Vec<Box<Grouping<RatioDuration>>> = vec![
-    //         Box::new(
-    //             Measure::from_contents(
-    //                 vec![
-    //                     Box::new(Beat::new_ratio(1, 4)),
-    //                     Box::new(Beat::new_ratio(1, 4)),
-    //                     Box::new(Beat::new_ratio(1, 4))
-    //                 ])
-    //         ),
-    //         Box::new(
-    //             Measure::from_contents(
-    //                 vec![
-    //                     Box::new(Beat::new_ratio(1, 4)),
-    //                     Box::new(Beat::new_ratio(1, 4)),
-    //                     Box::new(Beat::new_ratio(1, 4))
-    //                 ])
-    //             )
-    //     ];
-    //     let mut controller = GroupingController::new(Box::new(groupings.into_iter())).unwrap();
-    //     assert_eq!(Ok(" %m. \n c4 ~ c4 d4  |\n %m. \n e4".to_string()), controller.format_notes(notes));
-    // }
 }
