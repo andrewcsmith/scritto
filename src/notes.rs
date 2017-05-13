@@ -158,7 +158,8 @@ where P: Pitch,
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::{IntegerDuration};
+    use super::super::{IntegerDuration, serde_json, serde_test};
+    use serde_test::{Token, assert_ser_tokens};
 
     #[test]
     fn translates_midi_to_note_name() {
@@ -189,6 +190,23 @@ mod tests {
     fn panic_on_empty_chord() {
         let chord = Chord::<ETPitch, IntegerDuration>::new(vec![], None);
         chord.text().as_str();
+    }
+
+    #[test]
+    fn test_serialize_single_note() {
+        let note = SingleNote::<ETPitch, IntegerDuration>::new(ETPitch(62), None);
+        assert_ser_tokens(&note, &[
+                      Token::Struct { name: "SingleNote", len: 2 },
+                      Token::Str("text"),
+                      Token::Str("d"),
+
+                      Token::Str("duration"),
+                      Token::Struct { name: "Duration", len: 1 },
+                      Token::Str("ly"),
+                      Token::Str(""),
+                      Token::StructEnd,
+                      Token::StructEnd,
+        ]);
     }
 }
 

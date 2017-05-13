@@ -32,6 +32,19 @@ where D: 'a + Durational
 impl<'a, D> NotesView<'a, D> 
 where D: 'a + Durational
 {
+    pub fn new(source: String, data: BTreeMap<String, Value>, controller: &'a mut GroupingController<D>) -> Self {
+        NotesView {
+            source: source,
+            data: data,
+            hb: Self::init_handlebars(),
+            controller: controller
+        }
+    }
+
+    fn init_handlebars() -> Handlebars {
+        Handlebars::new()
+    }
+
     pub fn render(&self) -> Result<String, TemplateRenderError> {
         self.hb.template_render(&self.source, &self.data)
     }
@@ -233,12 +246,10 @@ mod tests {
     fn test_viewable_format() {
         let notes = initialize_notes();
         let mut controller = initialize_controller();
-        let mut view = NotesView {
-            hb: Handlebars::new(),
-            source: "".to_string(),
-            data: BTreeMap::new(),
-            controller: &mut controller
-        };
+        let mut view = NotesView::new(
+            "{{{ notes }}}".to_string(),
+            BTreeMap::new(),
+            &mut controller);
 
         // let ref mut v = view;
         let out0 = vec![notes[0].clone()].format(&mut view).unwrap();

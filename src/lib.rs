@@ -1,6 +1,9 @@
 extern crate handlebars;
 extern crate serde;
+
+#[macro_use]
 extern crate serde_json;
+extern crate serde_test;
 
 pub mod notes;
 pub mod sequenza;
@@ -238,5 +241,12 @@ mod tests {
     fn as_lilypond_dotted() {
         let dur = Duration(RatioDuration(3, 4));
         assert_eq!(dur.as_lilypond(), "4.");
+    }
+
+    #[test]
+    fn test_serialize_duration() {
+        let dur = Duration(RatioDuration(3, 4));
+        let out = json!({ "ly": "4." });
+        assert_eq!(serde_json::to_string(&dur).unwrap(), out.to_string());
     }
 }
