@@ -12,84 +12,33 @@ pub trait View<D: Durational, Input> {
     fn format<'b>(&'b mut self, input: Input) -> Result<String, &'static str>;
 }
 
-pub trait Viewable<'a, D: 'a + Durational>: Sized {
+pub trait Viewable<'a, D>: Sized 
+where D: 'a + Durational
+{
     type View: View<D, Self>;
 
     fn format<'b>(self, view: &'b mut Self::View) -> Result<String, &'static str>;
 }
 
-pub struct NoteView<'a, D: 'a + Durational> {
+pub struct NotesView<'a, D> 
+where D: 'a + Durational
+{
     pub source: String,
     pub data: BTreeMap<String, Value>,
     hb: Handlebars,
     controller: &'a mut GroupingController<D>
 }
 
-pub struct NotesView<'a, D: 'a + Durational> {
-    pub source: String,
-    pub data: BTreeMap<String, Value>,
-    hb: Handlebars,
-    controller: &'a mut GroupingController<D>
-}
-
-impl<'a, D: 'a + Durational> NoteView<'a, D> {
-    pub fn format_note<N: Note<D> + Clone>(&mut self, note: N) -> Result<String, &'static str> {
-        // Since Durational: Copy, this creates a temporary copy
-        let mut dur = note.duration();
-        let mut out = String::new();
-
-        for g in self.controller.stack.iter() {
-            if g.is_start_of_grouping() {
-                out.push_str(g.grouping.start_annotation());
-            }
-        }
-
-        // If the note overflows the current grouping...
-        if self.controller.current()?.left < dur {
-            let left = self.controller.current()?.left;
-            out.push_str(format!("{}{}{} ~ ", note.text(), left.as_lilypond(), note.annotations()).as_str());
-
-            for g in self.controller.consume_time(left)? {
-                out.push_str(g.end_annotation());
-            }
-
-            dur = dur - left;
-
-            while self.controller.current()?.left <= dur {
-                let left = self.controller.current()?.left;
-                out.push_str(format!("{}{}", note.text(), left.as_lilypond()).as_str());
-                dur = dur - left;
-                if dur.as_float() > 0.0 {
-                    out.push_str(" ~ ");
-                }
-
-                for g in self.controller.consume_time(left)? {
-                    out.push_str(g.end_annotation());
-                }
-            }
-
-            if dur.as_float() > 0.0 {
-                out.push_str(format!("{}{}", note.text(), self.controller.current()?.left.as_lilypond()).as_str());
-            }
-
-            Ok(out)
-        } else {
-            out.push_str(format!("{}{}{}", note.text(), dur.as_lilypond(), note.annotations()).as_str());
-            for g in self.controller.consume_time(dur)? {
-                out.push_str(g.end_annotation());
-            }
-            Ok(out)
-        }
-    }
-}
-
-
-impl<'a, D: 'a + Durational> NotesView<'a, D> {
+impl<'a, D> NotesView<'a, D> 
+where D: 'a + Durational
+{
     pub fn render(&self) -> Result<String, TemplateRenderError> {
         self.hb.template_render(&self.source, &self.data)
     }
 
-    pub fn format_note<N: Note<D> + Clone>(&mut self, note: N) -> Result<String, &'static str> {
+    pub fn format_note<N>(&mut self, note: N) -> Result<String, &'static str> 
+        where N: Note<D> + Clone
+    {
         // Since Durational: Copy, this creates a temporary copy
         let mut dur = note.duration();
         let mut out = String::new();
@@ -138,7 +87,9 @@ impl<'a, D: 'a + Durational> NotesView<'a, D> {
         }
     }
 
-    pub fn format_notes<N: Note<D> + Clone>(&mut self, notes: Vec<N>) -> Result<String, &'static str> {
+    pub fn format_notes<N>(&mut self, notes: Vec<N>) -> Result<String, &'static str> 
+        where N: Note<D> + Clone
+    {
         Ok(notes.into_iter()
             .map(|n| self.format_note(n).unwrap())
             .collect::<Vec<String>>().join(" "))
@@ -210,7 +161,7 @@ mod tests {
 
     #[test]
     fn test_view() {
-        let mut hb = Handlebars::new();
+        let hb = Handlebars::new();
         let source = "{{#each notes as |note|}} {{{note}}} {{/each}}".to_string();
         let mut data = BTreeMap::new();
         let notes = vec![

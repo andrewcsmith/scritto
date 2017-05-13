@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate serde_derive;
-
 extern crate handlebars;
 extern crate serde;
 extern crate serde_json;
@@ -40,13 +37,17 @@ pub trait Durational: Sized + Copy + PartialEq {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Duration<D: Durational>(pub D);
 
-impl<D: Durational + PartialEq> PartialOrd for Duration<D> {
+impl<D> PartialOrd for Duration<D> 
+where D: Durational + PartialEq
+{
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.as_float().partial_cmp(&other.as_float())
     }
 }
 
-impl<D: Durational> Sub for Duration<D> {
+impl<D> Sub for Duration<D> 
+where D: Durational
+{
     type Output = Self;
 
     fn sub(self, other: Self) -> Self {
@@ -67,7 +68,9 @@ impl<D: Durational> Sub for Duration<D> {
     }
 }
 
-impl<D: Durational> Add for Duration<D> {
+impl<D> Add for Duration<D> 
+where D: Durational
+{
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
@@ -88,7 +91,9 @@ impl<D: Durational> Add for Duration<D> {
     }
 }
 
-impl<D: Durational> Durational for Duration<D> {
+impl<D> Durational for Duration<D> 
+where D: Durational
+{
     fn new(a: u32, b: u32) -> Self {
         Duration(D::new(a, b))
     }
@@ -106,14 +111,20 @@ impl<D: Durational> Durational for Duration<D> {
     }
 }
 
-impl<D: Durational> From<D> for Duration<D> {
+impl<D> From<D> for Duration<D> 
+where D: Durational
+{
     fn from(d: D) -> Self {
         Duration(d)
     }
 }
 
-impl<D: Durational> Serialize for Duration<D> {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+impl<D> Serialize for Duration<D> 
+where D: Durational
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> 
+        where S: Serializer
+    {
         let mut s = serializer.serialize_struct("Duration", 1)?;
         s.serialize_field("ly", &self.as_lilypond())?;
         s.end()
@@ -186,8 +197,6 @@ pub trait Pitch {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::notes::*;
-    use super::sequenza::*;
 
     #[test]
     fn subtract_duration() {

@@ -3,10 +3,12 @@
 //! trait, which allows for generalization over various types of groupings, and the possibility for
 //! `Note` values to overflow one grouping or another.
 
-use super::{Duration, Durational, Note};
+use super::{Duration, Durational};
 
 /// Primary trait of a given hierarchical level. 
-pub trait Grouping<D: Durational> {
+pub trait Grouping<D> 
+where D: Durational
+{
     fn duration(&self) -> Duration<D>;
 
     fn next(&mut self) -> Option<Box<Grouping<D>>> { None }
@@ -19,28 +21,38 @@ pub trait Grouping<D: Durational> {
 /// The simplest form of `Grouping`, which has a particular duration and does not allow a given
 /// `Note` to overflow its bounds.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Beat<D: Durational> {
+pub struct Beat<D> 
+where D: Durational
+{
     duration: Duration<D>
 }
 
 /// A `Grouping` which contains other `Grouping`s.
-pub struct Measure<D: Durational> {
+pub struct Measure<D> 
+where D: Durational
+{
     duration: Duration<D>,
     contents: Vec<Box<Grouping<D>>>
 }
 
-pub struct ControlledGrouping<D: Durational> {
+pub struct ControlledGrouping<D> 
+where D: Durational
+{
     pub left: Duration<D>,
     pub grouping: Box<Grouping<D>>
 }
 
 /// GroupingController holds a stack of groupings, and an iterator
-pub struct GroupingController<D: Durational> {
+pub struct GroupingController<D> 
+where D: Durational
+{
     pub stack: Vec<ControlledGrouping<D>>,
     pub queue: Box<Iterator<Item=Box<Grouping<D>>>>
 }
 
-impl<D: Durational> Beat<D> {
+impl<D> Beat<D> 
+where D: Durational
+{
     pub fn new_ratio(a: u32, b: u32) -> Self {
         Beat {
             duration: Duration(D::new(a, b))
@@ -48,13 +60,17 @@ impl<D: Durational> Beat<D> {
     }
 }
 
-impl<D: Durational> Grouping<D> for Beat<D> {
+impl<D> Grouping<D> for Beat<D> 
+where D: Durational
+{
     fn duration(&self) -> Duration<D> {
         self.duration
     }
 }
 
-impl<D: Durational> Measure<D> {
+impl<D> Measure<D> 
+where D: Durational
+{
     pub fn from_contents(contents: Vec<Box<Grouping<D>>>) -> Self {
         let total_duration = contents.iter().fold(Duration::<D>::new(0, 1), |acc, d| {
             d.duration() + acc
@@ -67,7 +83,9 @@ impl<D: Durational> Measure<D> {
     }
 }
 
-impl<D: Durational> Grouping<D> for Measure<D> {
+impl<D> Grouping<D> for Measure<D> 
+where D: Durational
+{
     fn duration(&self) -> Duration<D> {
         self.duration
     }
@@ -84,7 +102,9 @@ impl<D: Durational> Grouping<D> for Measure<D> {
     fn end_annotation(&self) -> &str { " |\n " }
 }
 
-impl<D: Durational> Into<ControlledGrouping<D>> for Box<Grouping<D>> {
+impl<D> Into<ControlledGrouping<D>> for Box<Grouping<D>> 
+where D: Durational
+{
     fn into(self) -> ControlledGrouping<D> {
         ControlledGrouping {
             left: self.duration(),
@@ -93,13 +113,17 @@ impl<D: Durational> Into<ControlledGrouping<D>> for Box<Grouping<D>> {
     }
 }
 
-impl<D: Durational> ControlledGrouping<D> {
+impl<D> ControlledGrouping<D> 
+where D: Durational
+{
     pub fn is_start_of_grouping(&self) -> bool {
         self.grouping.duration().as_ratio() == self.left.as_ratio()
     }
 }
 
-impl<D: Durational> GroupingController<D> {
+impl<D> GroupingController<D> 
+where D: Durational
+{
     pub fn new(mut groupings: Box<Iterator<Item=Box<Grouping<D>>>>) -> Result<Self, &'static str> {
         let mut current: Vec<ControlledGrouping<D>> = vec![];
         let current_grouping = groupings.next()

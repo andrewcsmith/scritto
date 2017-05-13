@@ -5,7 +5,9 @@
 use super::{Duration, Durational, Pitch};
 use serde::ser::{Serialize, Serializer, SerializeStruct};
 
-pub trait Note<D: Durational> {
+pub trait Note<D> 
+where D: Durational
+{
     /// Duration of the `Note` should be given as a ratio tuple. This is to facilitate working with
     /// metrical divisions, including potential tuplets.
     fn duration(&self) -> Duration<D>;
@@ -53,7 +55,10 @@ pub struct SingleNote<P: Pitch, D: Durational> {
     pitch: P 
 }
 
-impl<P: Pitch, D: Durational> SingleNote<P, D> {
+impl<P, D> SingleNote<P, D> 
+where P: Pitch,
+      D: Durational
+{
     pub fn new<IntoP: Into<P>, T: Into<Option<Duration<D>>>>(pitch: IntoP, duration: T) -> Self {
         Self {
             duration: duration.into(),
@@ -62,7 +67,10 @@ impl<P: Pitch, D: Durational> SingleNote<P, D> {
     }
 }
 
-impl<P: Pitch, D: Durational> Note<D> for SingleNote<P, D> {
+impl<P, D> Note<D> for SingleNote<P, D> 
+where P: Pitch,
+      D: Durational
+{
     fn duration(&self) -> Duration<D> {
         self.duration.unwrap_or(Duration::<D>::new(1, 1))
     }
@@ -72,8 +80,13 @@ impl<P: Pitch, D: Durational> Note<D> for SingleNote<P, D> {
     }
 }
 
-impl<P: Pitch, D: Durational> Serialize for SingleNote<P, D> {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+impl<P, D> Serialize for SingleNote<P, D> 
+where P: Pitch,
+      D: Durational
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> 
+        where S: Serializer
+    {
         let mut s = serializer.serialize_struct("SingleNote", 2)?;
         s.serialize_field("text", &self.text())?;
         s.serialize_field("duration", &self.duration())?;
@@ -81,8 +94,13 @@ impl<P: Pitch, D: Durational> Serialize for SingleNote<P, D> {
     }
 }
 
-impl<P: Pitch, D: Durational> Serialize for Chord<P, D> {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+impl<P, D> Serialize for Chord<P, D> 
+where P: Pitch,
+      D: Durational
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> 
+        where S: Serializer
+    {
         let mut s = serializer.serialize_struct("SingleNote", 2)?;
         s.serialize_field("text", &self.text())?;
         s.serialize_field("duration", &self.duration())?;
@@ -90,13 +108,22 @@ impl<P: Pitch, D: Durational> Serialize for Chord<P, D> {
     }
 }
 
-pub struct Chord<P: Pitch, D: Durational> {
+pub struct Chord<P, D> 
+where P: Pitch,
+      D: Durational
+{
     duration: Option<Duration<D>>,
     pitches: Vec<P>
 }
 
-impl<P: Pitch, D: Durational> Chord<P, D> {
-    pub fn new<U: Into<Vec<P>>, T: Into<Option<Duration<D>>>>(pitches: U, duration: T) -> Self {
+impl<P, D> Chord<P, D> 
+where P: Pitch,
+      D: Durational
+{
+    pub fn new<U, T>(pitches: U, duration: T) -> Self 
+        where U: Into<Vec<P>>,
+              T: Into<Option<Duration<D>>>
+    {
         Self {
             duration: duration.into(),
             pitches: pitches.into()
@@ -104,7 +131,10 @@ impl<P: Pitch, D: Durational> Chord<P, D> {
     }
 }
 
-impl<P: Pitch, D: Durational> Note<D> for Chord<P, D> {
+impl<P, D> Note<D> for Chord<P, D> 
+where P: Pitch,
+      D: Durational
+{
     fn duration(&self) -> Duration<D> {
         self.duration.unwrap_or(Duration::<D>::new(1, 1))
     }
@@ -128,7 +158,7 @@ impl<P: Pitch, D: Durational> Note<D> for Chord<P, D> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::{IntegerDuration, RatioDuration};
+    use super::super::{IntegerDuration};
 
     #[test]
     fn translates_midi_to_note_name() {
