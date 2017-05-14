@@ -1,12 +1,15 @@
 //! Essentially, `scrittore` is a `View` module (in the Model-View-Controller paradigm) which
 //! is called by a Controller to render the collection of Notes.
 
-use handlebars::{Handlebars, TemplateRenderError};
-use serde_json::Value;
+use handlebars::{Handlebars, Helper, RenderContext, TemplateError, RenderError};
+use serde_json::{self, Value};
+use serde::{Deserialize};
 use std::collections::BTreeMap;
+use std::error::Error;
 
-use super::{Durational, Note};
+use super::{Duration, Durational, IntegerDuration, RatioDuration, Note};
 use super::sequenza::GroupingController;
+use super::notes::{ETPitch, SingleNote};
 
 pub trait View<D: Durational, Input> {
     fn format<'b>(&'b mut self, input: Input) -> Result<String, &'static str>;
@@ -23,30 +26,79 @@ where D: 'a + Durational
 pub struct NotesView<'a, D> 
 where D: 'a + Durational
 {
-    pub source: String,
     pub data: BTreeMap<String, Value>,
     hb: Handlebars,
     controller: &'a mut GroupingController<D>
 }
 
 impl<'a, D> NotesView<'a, D> 
-where D: 'a + Durational
+where D: 'a + Durational,
+      for<'de> D: Deserialize<'de>
 {
-    pub fn new(source: String, data: BTreeMap<String, Value>, controller: &'a mut GroupingController<D>) -> Self {
-        NotesView {
-            source: source,
+    pub fn new(source: String, data: BTreeMap<String, Value>, controller: &'a mut GroupingController<D>) -> Result<Self, TemplateError> {
+        let mut view = NotesView {
             data: data,
-            hb: Self::init_handlebars(),
+            hb: Self::init_handlebars(source)?,
             controller: controller
-        }
+        };
+
+        let format_note_helper = |h: &Helper, _: &Handlebars, rc: &mut RenderContext| -> Result<(), RenderError> {
+            match h.param(0).ok_or(RenderError::new("format_note expects 1 param"))?.value() {
+                &Value::Object(ref s) => {
+                    let note: Box<Note<D>> = match s.get("pitch_type").unwrap() {
+                        &Value::String(ref x) if x.as_str() == "ETPitch" => {
+                            let note: SingleNote<ETPitch, D> = serde_json::from_value(Value::Object(s.clone()))
+                                .map_err(|e| RenderError::new(e.description()))?;
+                            Box::new(note)
+                        },
+                        _ => { return Err(RenderError::new("Not a known Pitch type")) }
+                    };
+
+                    let out = format!("{}{}", note.text(), note.duration().as_lilypond());
+                    rc.writer.write(out.into_bytes().as_ref())?;
+                },
+                _ => { }
+            }
+
+            Ok(())
+        };
+
+        let ly_helper = |h: &Helper, _: &Handlebars, rc: &mut RenderContext| -> Result<(), RenderError> {
+            match h.param(0).unwrap().value() {
+                &Value::Object(ref s) => {
+                    let dur_value = s.get("duration").ok_or(RenderError::new("Param 0 should implement Durational"))?;
+                    let duration: Duration<RatioDuration> = serde_json::from_value(dur_value.clone()).unwrap();
+                    let out = format!("{}", duration.as_lilypond());
+                    rc.writer.write(out.into_bytes().as_ref())?;
+                },
+                &Value::Array(ref val) => {
+                    let duration: Duration<D> = serde_json::from_value(Value::Array(val.clone()))
+                        .map_err(|e| RenderError::new(e.description()))?;
+                    let out = format!("{}", duration.as_lilypond());
+                    rc.writer.write(out.as_bytes().as_ref())?;
+                },
+                _ => { }
+            }
+            Ok(())
+        };
+
+        view.hb.register_helper("format_note", Box::new(format_note_helper));
+        view.hb.register_helper("ly", Box::new(ly_helper));
+
+        Ok(view)
     }
 
-    fn init_handlebars() -> Handlebars {
-        Handlebars::new()
+    fn init_handlebars(source: String) -> Result<Handlebars, TemplateError> {
+        let mut hb = Handlebars::new();
+        // Override the default with a no-escape function
+        let escape_fn = |s: &str| -> String { s.to_string() };
+        hb.register_escape_fn(escape_fn);
+        hb.register_template_string("template", source)?;
+        Ok(hb)
     }
 
-    pub fn render(&self) -> Result<String, TemplateRenderError> {
-        self.hb.template_render(&self.source, &self.data)
+    pub fn render(&self) -> Result<String, RenderError> {
+        self.hb.render("template", &self.data)
     }
 
     pub fn format_note<N>(&mut self, note: N) -> Result<String, &'static str> 
@@ -111,7 +163,8 @@ where D: 'a + Durational
 
 impl<'a, D, N> View<D, Vec<N>> for NotesView<'a, D> 
 where D: 'a + Durational,
-      N: Note<D> + Clone
+      N: Note<D> + Clone,
+      for<'de> D: Deserialize<'de>
 {
     fn format<'b>(&'b mut self, input: Vec<N>) -> Result<String, &'static str> {
         self.format_notes(input)
@@ -120,7 +173,8 @@ where D: 'a + Durational,
 
 impl<'a, D, N> Viewable<'a, D> for Vec<N>
 where D: 'a + Durational,
-      N: Note<D> + Clone
+      N: Note<D> + Clone,
+      for<'de> D: Deserialize<'de>
 {
     type View = NotesView<'a, D>;
 
@@ -173,40 +227,11 @@ mod tests {
     }
 
     #[test]
-    fn test_view() {
-        let hb = Handlebars::new();
-        let source = "{{#each notes as |note|}} {{{note}}} {{/each}}".to_string();
-        let mut data = BTreeMap::new();
-        let notes = vec![
-            "c4".to_string(),
-            "d4".to_string(),
-            "e4".to_string()
-        ];
-
-        data.insert("notes".to_string(), handlebars::to_json(&notes));
-        let exp = " c4  d4  e4 ".to_string();
-
-        assert_eq!(hb.template_render(&source, &data).unwrap(), exp);
-
-        let mut controller = initialize_controller();
-
-        let view = NotesView {
-            hb: hb,
-            source: source,
-            data: data,
-            controller: &mut controller
-        };
-
-        assert_eq!(view.render().unwrap(), exp);
-    }
-
-    #[test]
     fn test_format_note() {
         let notes = initialize_notes();
         let mut controller = initialize_controller();
         let mut view = NotesView {
             hb: Handlebars::new(),
-            source: "".to_string(),
             data: BTreeMap::new(),
             controller: &mut controller
         };
@@ -220,7 +245,6 @@ mod tests {
         let mut controller = initialize_controller();
         let mut view = NotesView {
             hb: Handlebars::new(),
-            source: "".to_string(),
             data: BTreeMap::new(),
             controller: &mut controller
         };
@@ -234,7 +258,6 @@ mod tests {
         let mut controller = initialize_controller();
         let mut view = NotesView {
             hb: Handlebars::new(),
-            source: "".to_string(),
             data: BTreeMap::new(),
             controller: &mut controller
         };
@@ -249,7 +272,7 @@ mod tests {
         let mut view = NotesView::new(
             "{{{ notes }}}".to_string(),
             BTreeMap::new(),
-            &mut controller);
+            &mut controller).unwrap();
 
         // let ref mut v = view;
         let out0 = vec![notes[0].clone()].format(&mut view).unwrap();
@@ -257,6 +280,36 @@ mod tests {
 
         assert_eq!(" %m. \n c4 ~ c4".to_string(), out0);
         assert_eq!("d4".to_string(), out1);
+    }
+
+    #[test]
+    fn test_render_with_template() {
+        let notes = initialize_notes();
+        let mut controller = initialize_controller();
+        let mut data = BTreeMap::new();
+        data.insert("note".to_string(), serde_json::to_value(&notes[0].clone()).unwrap());
+        let view = NotesView::new(
+            "{{ note.text }}{{ ly note.duration }}".to_string(),
+            data,
+            &mut controller).unwrap();
+
+        view.render().unwrap();
+        assert_eq!("c2".to_string(), view.render().unwrap());
+    }
+
+    #[test]
+    fn test_render_with_helpers() {
+        let notes = initialize_notes();
+        let mut controller = initialize_controller();
+        let mut data = BTreeMap::new();
+        data.insert("note".to_string(), serde_json::to_value(&notes[0].clone()).unwrap());
+        let view = NotesView::new(
+            "{{ format_note note }}".to_string(),
+            data,
+            &mut controller).unwrap();
+
+        view.render().unwrap();
+        assert_eq!("c4 ~ c4".to_string(), view.render().expect("Panic on view.render()"));
     }
 }
 

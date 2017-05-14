@@ -1,15 +1,20 @@
 extern crate handlebars;
+
+#[allow(unused)]
+#[macro_use] extern crate serde_derive;
+
 extern crate serde;
 
-#[macro_use]
-extern crate serde_json;
+#[allow(unused)]
+#[macro_use] extern crate serde_json;
 extern crate serde_test;
 
 pub mod notes;
 pub mod sequenza;
 pub mod scrittore;
 
-use serde::ser::{Serialize, Serializer, SerializeStruct};
+use serde::{Serialize, Serializer};
+use serde::ser::{SerializeStruct, SerializeTupleStruct};
 
 use std::ops::{Add, Sub};
 use std::cmp::{PartialOrd, PartialEq, Ordering};
@@ -37,7 +42,7 @@ pub trait Durational: Sized + Copy + PartialEq {
 /// [orphan trait constraint](https://doc.rust-lang.org/error-index.html#E0210). This allows
 /// implementation of `std::ops` traits to make it easier to write generic code over various
 /// `Durational` types.
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Duration<D: Durational>(pub D);
 
 impl<D> PartialOrd for Duration<D> 
@@ -122,19 +127,7 @@ where D: Durational
     }
 }
 
-impl<D> Serialize for Duration<D> 
-where D: Durational
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> 
-        where S: Serializer
-    {
-        let mut s = serializer.serialize_struct("Duration", 1)?;
-        s.serialize_field("ly", &self.as_lilypond())?;
-        s.end()
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 struct IntegerDuration(u32);
 
 impl Durational for IntegerDuration {
@@ -145,9 +138,24 @@ impl Durational for IntegerDuration {
     fn as_ratio(&self) -> (u32, u32) {
         (self.0, 1)
     }
+
+    fn as_lilypond(&self) -> String {
+        match self.as_ratio() {
+            (x, 1) => {
+                format!("1*{}", x.to_string())
+            },
+            _ => { String::new() }
+        }
+    }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+impl From<u32> for Duration<IntegerDuration> {
+    fn from(x: u32) -> Duration<IntegerDuration> {
+        Duration(IntegerDuration(x))
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 struct RatioDuration(pub u32, pub u32);
 
 impl Durational for RatioDuration {
@@ -192,14 +200,18 @@ fn lcm(a: u32, b: u32) -> u32 {
 /// pitches that take the form of the Helmholtz-Ellis accidentals as written in the Lilypond HE
 /// library created by Andrew C. Smith.
 pub trait Pitch {
-    /// The only required method is one which translates the starting pitch to a note name of some
-    /// sort, needed for the start of each `Note`.
+    /// translates the starting pitch to a note name of some sort, needed for the start of each
+    /// `Note`.
     fn pitch(&self) -> String;
+
+    /// Should return the name of the specific type, for use in deserialization.
+    fn pitch_type(&self) -> &'static str;
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_test::{Token, assert_tokens};
 
     #[test]
     fn subtract_duration() {
@@ -246,7 +258,37 @@ mod tests {
     #[test]
     fn test_serialize_duration() {
         let dur = Duration(RatioDuration(3, 4));
-        let out = json!({ "ly": "4." });
+        let out = json!([3,4]);
         assert_eq!(serde_json::to_string(&dur).unwrap(), out.to_string());
+    }
+
+    #[test]
+    fn test_tokens_integer_duration() {
+        let dur = IntegerDuration(1);
+        assert_tokens(&dur, &[
+                      Token::NewtypeStruct { name: "IntegerDuration" },
+                      Token::U32(1)
+        ]);
+    }
+
+    #[test]
+    fn test_tokens_ratio_duration() {
+        let dur = RatioDuration(1, 4);
+        assert_tokens(&dur, &[
+                      Token::TupleStruct { name: "RatioDuration", len: 2 },
+                      Token::U32(1),
+                      Token::U32(4),
+                      Token::TupleStructEnd
+        ]);
+    }
+
+    #[test]
+    fn test_tokens_duration() {
+        let dur = Duration(IntegerDuration(1));
+        assert_tokens(&dur, &[
+                      Token::NewtypeStruct { name: "Duration" },
+                      Token::NewtypeStruct { name: "IntegerDuration" },
+                      Token::U32(1),
+        ]);
     }
 }

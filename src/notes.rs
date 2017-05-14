@@ -3,7 +3,8 @@
 //! `Pitch` is specific to translating the onset of the `Note` into text.
 
 use super::{Duration, Durational, Pitch};
-use serde::ser::{Serialize, Serializer, SerializeStruct};
+use serde::{Serialize, Serializer};
+use serde::ser::SerializeStruct;
 
 pub trait Note<D> 
 where D: Durational
@@ -26,7 +27,7 @@ where D: Durational
 
 /// On the incomprehensible reason you would want to use equal temperament, this quicky is provided
 /// to translate midi note values into easy chord names.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ETPitch(pub u32);
 
 static ET_SCALE: [&str; 12] = ["c", "csharp", "d", "eflat", "e", "f", "fsharp", "g", "gsharp", "a", "bflat", "b"];
@@ -41,6 +42,10 @@ impl Pitch for ETPitch {
     fn pitch(&self) -> String {
         ET_SCALE[self.0 as usize % 12].to_string()
     }
+
+    fn pitch_type(&self) -> &'static str {
+        "ETPitch"
+    }
 }
 
 impl From<u32> for ETPitch {
@@ -49,9 +54,9 @@ impl From<u32> for ETPitch {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Deserialize)]
 pub struct SingleNote<P: Pitch, D: Durational> {
-    duration: Option<Duration<D>>,
+    duration: Duration<D>,
     pitch: P 
 }
 
@@ -59,7 +64,7 @@ impl<P, D> SingleNote<P, D>
 where P: Pitch,
       D: Durational
 {
-    pub fn new<IntoP: Into<P>, T: Into<Option<Duration<D>>>>(pitch: IntoP, duration: T) -> Self {
+    pub fn new<IntoP: Into<P>, T: Into<Duration<D>>>(pitch: IntoP, duration: T) -> Self {
         Self {
             duration: duration.into(),
             pitch: pitch.into()
@@ -72,7 +77,7 @@ where P: Pitch,
       D: Durational
 {
     fn duration(&self) -> Duration<D> {
-        self.duration.unwrap_or(Duration::<D>::new(1, 1))
+        self.duration
     }
 
     fn text(&self) -> String {
@@ -81,28 +86,16 @@ where P: Pitch,
 }
 
 impl<P, D> Serialize for SingleNote<P, D> 
-where P: Pitch,
-      D: Durational
+where P: Pitch + Serialize,
+      D: Durational + Serialize
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> 
         where S: Serializer
     {
-        let mut s = serializer.serialize_struct("SingleNote", 2)?;
+        let mut s = serializer.serialize_struct("SingleNote", 4)?;
         s.serialize_field("text", &self.text())?;
-        s.serialize_field("duration", &self.duration())?;
-        s.end()
-    }
-}
-
-impl<P, D> Serialize for Chord<P, D> 
-where P: Pitch,
-      D: Durational
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> 
-        where S: Serializer
-    {
-        let mut s = serializer.serialize_struct("SingleNote", 2)?;
-        s.serialize_field("text", &self.text())?;
+        s.serialize_field("pitch_type", &self.pitch.pitch_type())?;
+        s.serialize_field("pitch", &self.pitch)?;
         s.serialize_field("duration", &self.duration())?;
         s.end()
     }
@@ -112,7 +105,7 @@ pub struct Chord<P, D>
 where P: Pitch,
       D: Durational
 {
-    duration: Option<Duration<D>>,
+    duration: Duration<D>,
     pitches: Vec<P>
 }
 
@@ -122,7 +115,7 @@ where P: Pitch,
 {
     pub fn new<U, T>(pitches: U, duration: T) -> Self 
         where U: Into<Vec<P>>,
-              T: Into<Option<Duration<D>>>
+              T: Into<Duration<D>>
     {
         Self {
             duration: duration.into(),
@@ -136,7 +129,7 @@ where P: Pitch,
       D: Durational
 {
     fn duration(&self) -> Duration<D> {
-        self.duration.unwrap_or(Duration::<D>::new(1, 1))
+        self.duration
     }
 
     fn text(&self) -> String {
@@ -155,11 +148,26 @@ where P: Pitch,
     }
 }
 
+impl<P, D> Serialize for Chord<P, D> 
+where P: Pitch + Serialize,
+      D: Durational + Serialize
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> 
+        where S: Serializer
+    {
+        let mut s = serializer.serialize_struct("Chord", 3)?;
+        s.serialize_field("text", &self.text())?;
+        s.serialize_field("pitches", &self.pitches)?;
+        s.serialize_field("duration", &self.duration())?;
+        s.end()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::{IntegerDuration, serde_json, serde_test};
-    use serde_test::{Token, assert_ser_tokens};
+    use super::super::{IntegerDuration};
+    use serde_test::{Token, assert_tokens, assert_ser_tokens};
 
     #[test]
     fn translates_midi_to_note_name() {
@@ -169,42 +177,58 @@ mod tests {
 
     #[test]
     fn gets_single_note_name() {
-        let note = SingleNote::<ETPitch, IntegerDuration>::new(ETPitch(62), None);
+        let note = SingleNote::<ETPitch, IntegerDuration>::new(ETPitch(62), 1);
         assert_eq!(note.text().as_str(), "d");
     }
 
     #[test]
     fn gets_chord_name() {
-        let chord = Chord::<ETPitch, IntegerDuration>::new(vec![ETPitch(60), ETPitch(64), ETPitch(67)], None);
+        let chord = Chord::<ETPitch, IntegerDuration>::new(vec![ETPitch(60), ETPitch(64), ETPitch(67)], 1);
         assert_eq!(chord.text().as_str(), "<c e g>");
     }
 
     #[test]
     fn one_note_chord() {
-        let chord = Chord::<ETPitch, IntegerDuration>::new(vec![ETPitch(60)], None);
+        let chord = Chord::<ETPitch, IntegerDuration>::new(vec![ETPitch(60)], 1);
         assert_eq!(chord.text().as_str(), "<c>");
     }
 
     #[test]
     #[should_panic]
     fn panic_on_empty_chord() {
-        let chord = Chord::<ETPitch, IntegerDuration>::new(vec![], None);
+        let chord = Chord::<ETPitch, IntegerDuration>::new(vec![], 1);
         chord.text().as_str();
     }
 
     #[test]
-    fn test_serialize_single_note() {
-        let note = SingleNote::<ETPitch, IntegerDuration>::new(ETPitch(62), None);
-        assert_ser_tokens(&note, &[
-                      Token::Struct { name: "SingleNote", len: 2 },
+    fn test_tokens_et_pitch() {
+        let pitch = ETPitch(62);
+        assert_tokens(&pitch, &[
+                      Token::NewtypeStruct { name: "ETPitch" },
+                      Token::U32(62),
+        ]);
+    }
+
+    #[test]
+    fn test_tokens_single_note() {
+        let note = SingleNote::<ETPitch, IntegerDuration>::new(ETPitch(62), 1);
+        assert_tokens(&note, &[
+                      Token::Struct { name: "SingleNote", len: 4 },
                       Token::Str("text"),
                       Token::Str("d"),
 
+                      Token::Str("pitch_type"),
+                      Token::Str("ETPitch"),
+
+                      Token::Str("pitch"),
+                      Token::NewtypeStruct { name: "ETPitch" },
+                      Token::U32(62),
+
                       Token::Str("duration"),
-                      Token::Struct { name: "Duration", len: 1 },
-                      Token::Str("ly"),
-                      Token::Str(""),
-                      Token::StructEnd,
+                      Token::NewtypeStruct { name: "Duration" },
+                      Token::NewtypeStruct { name: "IntegerDuration" },
+                      Token::U32(1),
+
                       Token::StructEnd,
         ]);
     }
