@@ -13,6 +13,8 @@ where D: Durational
     /// metrical divisions, including potential tuplets.
     fn duration(&self) -> Duration<D>;
 
+    fn set_duration(&mut self, d: Duration<D>);
+
     /// Text of the beginning of the note (excluding duration), which will be passed on to the
     /// given template. This appears at the start of the Note and is repeated as necessary
     /// following any ties.
@@ -80,6 +82,10 @@ where P: Pitch,
         self.duration
     }
 
+    fn set_duration(&mut self, d: Duration<D>) {
+        self.duration = d
+    }
+
     fn text(&self) -> String {
         self.pitch.pitch()
     }
@@ -92,8 +98,10 @@ where P: Pitch + Serialize,
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> 
         where S: Serializer
     {
-        let mut s = serializer.serialize_struct("SingleNote", 4)?;
+        let mut s = serializer.serialize_struct("SingleNote", 6)?;
         s.serialize_field("text", &self.text())?;
+        s.serialize_field("ly_duration", &self.duration().as_lilypond())?;
+        s.serialize_field("annotations", &self.annotations())?;
         s.serialize_field("pitch_type", &self.pitch.pitch_type())?;
         s.serialize_field("pitch", &self.pitch)?;
         s.serialize_field("duration", &self.duration())?;
@@ -130,6 +138,10 @@ where P: Pitch,
 {
     fn duration(&self) -> Duration<D> {
         self.duration
+    }
+
+    fn set_duration(&mut self, d: Duration<D>) {
+        self.duration = d
     }
 
     fn text(&self) -> String {
@@ -213,9 +225,15 @@ mod tests {
     fn test_tokens_single_note() {
         let note = SingleNote::<ETPitch, IntegerDuration>::new(ETPitch(62), 1);
         assert_tokens(&note, &[
-                      Token::Struct { name: "SingleNote", len: 4 },
+                      Token::Struct { name: "SingleNote", len: 6 },
                       Token::Str("text"),
                       Token::Str("d"),
+
+                      Token::Str("ly_duration"),
+                      Token::Str("1*1"),
+
+                      Token::Str("annotations"),
+                      Token::Str(""),
 
                       Token::Str("pitch_type"),
                       Token::Str("ETPitch"),

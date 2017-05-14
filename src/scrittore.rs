@@ -3,7 +3,7 @@
 
 use handlebars::{Handlebars, Helper, RenderContext, TemplateError, RenderError};
 use serde_json::{self, Value};
-use serde::{Deserialize};
+use serde::{Serialize, Deserialize};
 use std::collections::BTreeMap;
 use std::error::Error;
 
@@ -93,6 +93,7 @@ where D: 'a + Durational,
         // Override the default with a no-escape function
         let escape_fn = |s: &str| -> String { s.to_string() };
         hb.register_escape_fn(escape_fn);
+        hb.register_template_string("start_group", "{{ note.text }}{{ note.ly_duration }}{{ note.annotations }} ~ ")?;
         hb.register_template_string("template", source)?;
         Ok(hb)
     }
@@ -102,7 +103,7 @@ where D: 'a + Durational,
     }
 
     pub fn format_note<N>(&mut self, note: N) -> Result<String, &'static str> 
-        where N: Note<D> + Clone
+        where N: Note<D> + Clone + Serialize
     {
         // Since Durational: Copy, this creates a temporary copy
         let mut dur = note.duration();
@@ -117,7 +118,13 @@ where D: 'a + Durational,
         // If the note overflows the current grouping...
         if self.controller.current()?.left < dur {
             let left = self.controller.current()?.left;
-            out.push_str(format!("{}{}{} ~ ", note.text(), left.as_lilypond(), note.annotations()).as_str());
+            // out.push_str(format!("{}{}{} ~ ", note.text(), left.as_lilypond(), note.annotations()).as_str());
+            let mut map = BTreeMap::new();
+            let mut tmp_note = note.clone();
+            tmp_note.set_duration(left);
+
+            map.insert("note", serde_json::to_value(tmp_note).unwrap());
+            out.push_str(self.hb.render("start_group", &map).map_err(|_| "Could not start group")?.as_str());
 
             for g in self.controller.consume_time(left)? {
                 out.push_str(g.end_annotation());
@@ -153,17 +160,17 @@ where D: 'a + Durational,
     }
 
     pub fn format_notes<N>(&mut self, notes: Vec<N>) -> Result<String, &'static str> 
-        where N: Note<D> + Clone
+        where N: Note<D> + Clone + Serialize
     {
         Ok(notes.into_iter()
-            .map(|n| self.format_note(n).unwrap())
+            .map(|n| self.format_note(n).unwrap_or(String::new()))
             .collect::<Vec<String>>().join(" "))
     }
 }
 
 impl<'a, D, N> View<D, Vec<N>> for NotesView<'a, D> 
 where D: 'a + Durational,
-      N: Note<D> + Clone,
+      N: Note<D> + Clone + Serialize,
       for<'de> D: Deserialize<'de>
 {
     fn format<'b>(&'b mut self, input: Vec<N>) -> Result<String, &'static str> {
@@ -173,7 +180,7 @@ where D: 'a + Durational,
 
 impl<'a, D, N> Viewable<'a, D> for Vec<N>
 where D: 'a + Durational,
-      N: Note<D> + Clone,
+      N: Note<D> + Clone + Serialize,
       for<'de> D: Deserialize<'de>
 {
     type View = NotesView<'a, D>;
@@ -230,11 +237,10 @@ mod tests {
     fn test_format_note() {
         let notes = initialize_notes();
         let mut controller = initialize_controller();
-        let mut view = NotesView {
-            hb: Handlebars::new(),
-            data: BTreeMap::new(),
-            controller: &mut controller
-        };
+        let mut view = NotesView::new(
+            String::new(),
+            BTreeMap::new(),
+            &mut controller).unwrap();
 
         assert_eq!(Ok(" %m. \n c4 ~ c4".to_string()), view.format_note(notes[0].clone()));
     }
@@ -243,11 +249,10 @@ mod tests {
     fn test_format_notes() {
         let notes = initialize_notes();
         let mut controller = initialize_controller();
-        let mut view = NotesView {
-            hb: Handlebars::new(),
-            data: BTreeMap::new(),
-            controller: &mut controller
-        };
+        let mut view = NotesView::new(
+            String::new(),
+            BTreeMap::new(),
+            &mut controller).unwrap();
 
         assert_eq!(Ok(" %m. \n c4 ~ c4 d4 e4 |\n   %m. \n f4".to_string()), view.format_notes(notes));
     }
@@ -256,11 +261,10 @@ mod tests {
     fn test_format() {
         let notes = initialize_notes();
         let mut controller = initialize_controller();
-        let mut view = NotesView {
-            hb: Handlebars::new(),
-            data: BTreeMap::new(),
-            controller: &mut controller
-        };
+        let mut view = NotesView::new(
+            String::new(),
+            BTreeMap::new(),
+            &mut controller).unwrap();
 
         assert_eq!(Ok(" %m. \n c4 ~ c4 d4 e4 |\n   %m. \n f4".to_string()), view.format(notes));
     }
@@ -302,12 +306,19 @@ mod tests {
         let notes = initialize_notes();
         let mut controller = initialize_controller();
         let mut data = BTreeMap::new();
+        let mut templates = BTreeMap::new();
+        templates.insert("start_group", "{{ note.text }}{{ note.duration.as_lilypond }}{{ note.start_annotation }}{{ tie }}");
+        templates.insert("continue_group", "{{ note.text }}{{ note.duration.as_lilypond }}{{ tie }}");
+        templates.insert("end_group", "{{ note.text }}{{ note.duration.as_lilypond }}");
+        templates.insert("solo_note", "{{ note.text }}{{ note.duration.as_lilypond }}{{ note.start_annotation }}");
+
         let mut view = NotesView::new(
             "{{ formatted_notes }}".to_string(),
             data,
             &mut controller).unwrap();
 
         view.data.insert("note".to_string(), serde_json::to_value(&notes[0].clone()).unwrap());
+        view.data.insert("tie".to_string(), serde_json::to_value(" ~ ").unwrap());
 
         let formatted_notes: String = view.format_note(notes[0].clone()).unwrap();
         view.data.insert("formatted_notes".to_string(), serde_json::to_value(formatted_notes.clone()).unwrap());
