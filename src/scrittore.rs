@@ -302,14 +302,18 @@ mod tests {
         let notes = initialize_notes();
         let mut controller = initialize_controller();
         let mut data = BTreeMap::new();
-        data.insert("note".to_string(), serde_json::to_value(&notes[0].clone()).unwrap());
-        let view = NotesView::new(
-            "{{ format_note note }}".to_string(),
+        let mut view = NotesView::new(
+            "{{ formatted_notes }}".to_string(),
             data,
             &mut controller).unwrap();
 
+        view.data.insert("note".to_string(), serde_json::to_value(&notes[0].clone()).unwrap());
+
+        let formatted_notes: String = view.format_note(notes[0].clone()).unwrap();
+        view.data.insert("formatted_notes".to_string(), serde_json::to_value(formatted_notes.clone()).unwrap());
+
         view.render().unwrap();
-        assert_eq!("c4 ~ c4".to_string(), view.render().expect("Panic on view.render()"));
+        assert_eq!(" %m. \n c4 ~ c4".to_string(), view.render().expect("Panic on view.render()"));
     }
 }
 
