@@ -278,6 +278,20 @@ mod tests {
     }
 
     #[test]
+    fn test_render_notes_with_chord_template() {
+        let notes = Notes::new(vec![
+                               Chord::new(vec![ETPitch::new(60), ETPitch::new(62)], 
+                                          RatioDuration(1, 2)),
+                               Chord::new(vec![ETPitch::new(64), ETPitch::new(65)], 
+                                          RatioDuration(1, 2))
+        ]);
+        let mut context = BTreeMap::new();
+        let mut view = NotesView::new(None, context).unwrap();
+        let out = notes.render(&mut view).unwrap();
+        assert_eq!(" < c  d >2  < e  f >2 \n", &out);
+    }
+
+    #[test]
     fn test_render_chord_template() {
         let chord: Chord<ETPitch, RatioDuration> = Chord::new(vec![ETPitch::new(60), ETPitch::new(62)], Duration(RatioDuration(1, 2)));
         let mut view = ChordView::new(None, BTreeMap::new()).unwrap();
