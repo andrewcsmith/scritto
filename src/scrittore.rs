@@ -23,21 +23,21 @@ where N: Note<D>,
 
 pub struct SingleNoteView<P, D>
 {
-    pub data: BTreeMap<String, Value>,
+    pub context: BTreeMap<String, Value>,
     hb: Handlebars,
     phantom: PhantomData<(P, D)>
 }
 
 pub struct ChordView<P, D>
 {
-    pub data: BTreeMap<String, Value>,
+    pub context: BTreeMap<String, Value>,
     hb: Handlebars,
     phantom: PhantomData<(P, D)>
 }
 
 pub struct NotesView<N, D>
 {
-    pub data: BTreeMap<String, Value>,
+    pub context: BTreeMap<String, Value>,
     hb: Handlebars,
     phantom: PhantomData<(N, D)>
 }
@@ -49,9 +49,18 @@ pub trait View: Sized
 {
     type Input;
 
-    fn new(source: String, data: BTreeMap<String, Value>) -> Result<Self, TemplateError>;
+    fn new(source: String, context: BTreeMap<String, Value>) -> Result<Self, TemplateError>;
 
-    fn render<'b>(&'b mut self, input: &Self::Input) -> Result<String, &'static str>;
+    fn hb(&self) -> &Handlebars;
+    fn context(&self) -> &BTreeMap<String, Value>;
+
+    fn load_context(&mut self, _: &Self::Input) -> Result<(), &'static str> { Ok(()) }
+
+    fn render<'b>(&'b mut self, input: &Self::Input) -> Result<String, &'static str> 
+    {
+        self.load_context(input);
+        self.hb().render("template", &self.context()).map_err(|_| "Could not render")
+    }
 
     fn init_handlebars(source: String) -> Result<Handlebars, TemplateError> 
     {
@@ -97,19 +106,22 @@ where D: 'a + Durational + Serialize,
 {
     type Input = SingleNote<P, D>;
 
-    fn new(source: String, data: BTreeMap<String, Value>) -> Result<Self, TemplateError> 
+    fn new(source: String, context: BTreeMap<String, Value>) -> Result<Self, TemplateError> 
     {
         let hb: Handlebars = Self::init_handlebars(source)?;
         let phantom = PhantomData;
-        Ok(SingleNoteView { data, hb, phantom })
+        Ok(SingleNoteView { context, hb, phantom })
     }
 
-    fn render<'b>(&'b mut self, input: &Self::Input) -> Result<String, &'static str> 
+    fn hb(&self) -> &Handlebars { &self.hb }
+    fn context(&self) -> &BTreeMap<String, Value> { &self.context }
+
+    fn load_context(&mut self, input: &Self::Input) -> Result<(), &'static str> 
     {
         let in_val = serde_json::to_value(input).map_err(|e| "Could not parse note into value")?;
         println!("{}", serde_json::to_string(&in_val).unwrap());
-        self.data.insert("note".to_string(), in_val);
-        self.hb.render("template", &self.data).map_err(|_| "Could not render")
+        self.context.insert("note".to_string(), in_val);
+        Ok(())
     }
 }
 
@@ -120,18 +132,21 @@ where D: 'a + Durational + Serialize,
 {
     type Input = Chord<P, D>;
 
-    fn new(source: String, data: BTreeMap<String, Value>) -> Result<Self, TemplateError> 
+    fn new(source: String, context: BTreeMap<String, Value>) -> Result<Self, TemplateError> 
     {
         let hb: Handlebars = Self::init_handlebars(source)?;
         let phantom = PhantomData;
-        Ok(ChordView { data, hb, phantom })
+        Ok(ChordView { context, hb, phantom })
     }
 
-    fn render<'b>(&'b mut self, input: &Self::Input) -> Result<String, &'static str> {
+    fn hb(&self) -> &Handlebars { &self.hb }
+    fn context(&self) -> &BTreeMap<String, Value> { &self.context }
+
+    fn load_context(&mut self, input: &Self::Input) -> Result<(), &'static str> {
         let in_val = serde_json::to_value(input).map_err(|e| "Could not parse chord into value")?;
         println!("{}", serde_json::to_string(&in_val).unwrap());
-        self.data.insert("chord".to_string(), in_val);
-        self.hb.render("template", &self.data).map_err(|_| "Could not render")
+        self.context.insert("chord".to_string(), in_val);
+        Ok(())
     }
 }
 
@@ -142,17 +157,20 @@ where D: 'a + Durational + Serialize,
 {
     type Input = Notes<N, D>;
 
-    fn new(source: String, data: BTreeMap<String, Value>) -> Result<Self, TemplateError> {
+    fn new(source: String, context: BTreeMap<String, Value>) -> Result<Self, TemplateError> {
         let hb: Handlebars = Self::init_handlebars(source)?;
         let phantom = PhantomData;
-        Ok(NotesView { data, hb, phantom })
+        Ok(NotesView { context, hb, phantom })
     }
 
-    fn render<'b>(&'b mut self, input: &Notes<N, D>) -> Result<String, &'static str> {
+    fn hb(&self) -> &Handlebars { &self.hb }
+    fn context(&self) -> &BTreeMap<String, Value> { &self.context }
+
+    fn load_context(&mut self, input: &Self::Input) -> Result<(), &'static str> {
         let in_val = serde_json::to_value(&input.data).map_err(|e| "Could not parse notes into value")?;
         println!("{}", serde_json::to_string(&in_val).unwrap());
-        self.data.insert("notes".to_string(), in_val);
-        self.hb.render("template", &self.data).map_err(|_| "Could not render")
+        self.context.insert("notes".to_string(), in_val);
+        Ok(())
     }
 }
 
@@ -199,10 +217,10 @@ mod tests {
     #[test]
     fn test_render_note() {
         let notes = initialize_notes();
-        let mut data = BTreeMap::new();
+        let mut context = BTreeMap::new();
         let mut view = SingleNoteView::new(
             "{{ note.text }}{{ note.ly_duration}}".to_string(),
-            data).unwrap();
+            context).unwrap();
 
         let out = notes[0].render(&mut view).unwrap();
         assert_eq!("c2", &out);
@@ -211,10 +229,10 @@ mod tests {
     #[test]
     fn test_render_chord() {
         let chord: Chord<ETPitch, RatioDuration> = Chord::new(vec![ETPitch::new(60), ETPitch::new(62)], Duration(RatioDuration(1, 2)));
-        let mut data = BTreeMap::new();
+        let mut context = BTreeMap::new();
         let mut view = ChordView::new(
             "<{{#each chord.pitches as |pitch| }} {{ pitch.ly }} {{ /each }}>{{ chord.ly_duration}}".to_string(),
-            data).unwrap();
+            context).unwrap();
 
         let out = chord.render(&mut view).unwrap();
         assert_eq!("< c  d >2", &out);
@@ -223,10 +241,10 @@ mod tests {
     #[test]
     fn test_render_notes() {
         let notes = Notes::new(initialize_notes());
-        let mut data = BTreeMap::new();
+        let mut context = BTreeMap::new();
         let mut view = NotesView::new(
             "{{ #each notes }} {{ text }}{{ ly_duration }} {{ /each }}".to_string(),
-            data).unwrap();
+            context).unwrap();
 
         let out = notes.render(&mut view).unwrap();
         assert_eq!(" c2  d4  e4  f4 ", out);
