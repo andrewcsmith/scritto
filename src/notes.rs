@@ -29,20 +29,35 @@ where D: Durational
 
 /// On the incomprehensible reason you would want to use equal temperament, this quicky is provided
 /// to translate midi note values into easy chord names.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ETPitch(pub u32);
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize)]
+pub struct ETPitch
+{
+    pub midi: u32
+}
+
+impl Serialize for ETPitch
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> 
+        where S: Serializer
+    {
+        let mut s = serializer.serialize_struct("ETPitch", 2)?;
+        s.serialize_field("midi", &self.midi)?;
+        s.serialize_field("ly", &self.pitch())?;
+        s.end()
+    }
+}
 
 static ET_SCALE: [&str; 12] = ["c", "csharp", "d", "eflat", "e", "f", "fsharp", "g", "gsharp", "a", "bflat", "b"];
 
 impl ETPitch {
-    pub fn new(midi_value: u32) -> Self {
-        ETPitch(midi_value)
+    pub fn new(midi: u32) -> Self {
+        ETPitch { midi }
     }
 }
 
 impl Pitch for ETPitch {
     fn pitch(&self) -> String {
-        ET_SCALE[self.0 as usize % 12].to_string()
+        ET_SCALE[self.midi as usize % 12].to_string()
     }
 
     fn pitch_type(&self) -> &'static str {
@@ -52,7 +67,7 @@ impl Pitch for ETPitch {
 
 impl From<u32> for ETPitch {
     fn from(f: u32) -> ETPitch {
-        ETPitch(f)
+        ETPitch::new(f)
     }
 }
 
@@ -109,6 +124,7 @@ where P: Pitch + Serialize,
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Deserialize)]
 pub struct Chord<P, D> 
 where P: Pitch,
       D: Durational
@@ -167,8 +183,11 @@ where P: Pitch + Serialize,
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> 
         where S: Serializer
     {
-        let mut s = serializer.serialize_struct("Chord", 3)?;
+        let mut s = serializer.serialize_struct("Chord", 6)?;
         s.serialize_field("text", &self.text())?;
+        s.serialize_field("ly_duration", &self.duration().as_lilypond())?;
+        s.serialize_field("annotations", &self.annotations())?;
+        s.serialize_field("pitch_type", &self.pitches[0].pitch_type())?;
         s.serialize_field("pitches", &self.pitches)?;
         s.serialize_field("duration", &self.duration())?;
         s.end()
@@ -183,25 +202,25 @@ mod tests {
 
     #[test]
     fn translates_midi_to_note_name() {
-        assert_eq!(ETPitch(60).pitch(), "c");
-        assert_eq!(ETPitch(69).pitch(), "a");
+        assert_eq!(ETPitch::new(60).pitch(), "c");
+        assert_eq!(ETPitch::new(69).pitch(), "a");
     }
 
     #[test]
     fn gets_single_note_name() {
-        let note = SingleNote::<ETPitch, IntegerDuration>::new(ETPitch(62), 1);
+        let note = SingleNote::<ETPitch, IntegerDuration>::new(ETPitch::new(62), 1);
         assert_eq!(note.text().as_str(), "d");
     }
 
     #[test]
     fn gets_chord_name() {
-        let chord = Chord::<ETPitch, IntegerDuration>::new(vec![ETPitch(60), ETPitch(64), ETPitch(67)], 1);
+        let chord = Chord::<ETPitch, IntegerDuration>::new(vec![ETPitch::new(60), ETPitch::new(64), ETPitch::new(67)], 1);
         assert_eq!(chord.text().as_str(), "<c e g>");
     }
 
     #[test]
     fn one_note_chord() {
-        let chord = Chord::<ETPitch, IntegerDuration>::new(vec![ETPitch(60)], 1);
+        let chord = Chord::<ETPitch, IntegerDuration>::new(vec![ETPitch::new(60)], 1);
         assert_eq!(chord.text().as_str(), "<c>");
     }
 
@@ -214,16 +233,23 @@ mod tests {
 
     #[test]
     fn test_tokens_et_pitch() {
-        let pitch = ETPitch(62);
+        let pitch = ETPitch::new(62);
         assert_tokens(&pitch, &[
-                      Token::NewtypeStruct { name: "ETPitch" },
+                      Token::Struct { name: "ETPitch", len: 2 },
+
+                      Token::Str("midi"),
                       Token::U32(62),
+
+                      Token::Str("ly"),
+                      Token::Str("d"),
+
+                      Token::StructEnd,
         ]);
     }
 
     #[test]
     fn test_tokens_single_note() {
-        let note = SingleNote::<ETPitch, IntegerDuration>::new(ETPitch(62), 1);
+        let note = SingleNote::<ETPitch, IntegerDuration>::new(ETPitch::new(62), 1);
         assert_tokens(&note, &[
                       Token::Struct { name: "SingleNote", len: 6 },
                       Token::Str("text"),
@@ -239,8 +265,15 @@ mod tests {
                       Token::Str("ETPitch"),
 
                       Token::Str("pitch"),
-                      Token::NewtypeStruct { name: "ETPitch" },
+                      Token::Struct { name: "ETPitch", len: 2 },
+
+                      Token::Str("midi"),
                       Token::U32(62),
+
+                      Token::Str("ly"),
+                      Token::Str("d"),
+
+                      Token::StructEnd,
 
                       Token::Str("duration"),
                       Token::NewtypeStruct { name: "Duration" },

@@ -189,6 +189,73 @@ where D: Durational
         }
     }
 
+    // pub fn format_note<N>(&mut self, note: N) -> Result<String, &'static str> 
+    //     where N: Note<D> + Clone + Serialize
+    // {
+    //     // Since Durational: Copy, this creates a temporary copy
+    //     let mut dur = note.duration();
+    //     let mut out = String::new();
+    //
+    //     for g in self.controller.stack.iter() {
+    //         if g.is_start_of_grouping() {
+    //             out.push_str(g.grouping.start_annotation());
+    //         }
+    //     }
+    //
+    //     // If the note overflows the current grouping...
+    //     if self.controller.current()?.left < dur {
+    //         let left = self.controller.current()?.left;
+    //         // "the old way" with pushing a string
+    //         // out.push_str(format!("{}{}{} ~ ", note.text(), left.as_lilypond(), note.annotations()).as_str());
+    //
+    //         let mut map = BTreeMap::new();
+    //         let mut tmp_note = note.clone();
+    //         tmp_note.set_duration(left);
+    //
+    //         map.insert("note", serde_json::to_value(tmp_note).unwrap());
+    //         out.push_str(self.hb.render("start_group", &map).map_err(|_| "Could not start group")?.as_str());
+    //
+    //         for g in self.controller.consume_time(left)? {
+    //             out.push_str(g.end_annotation());
+    //         }
+    //
+    //         dur = dur - left;
+    //
+    //         while self.controller.current()?.left <= dur {
+    //             let left = self.controller.current()?.left;
+    //             out.push_str(format!("{}{}", note.text(), left.as_lilypond()).as_str());
+    //             dur = dur - left;
+    //             if dur.as_float() > 0.0 {
+    //                 out.push_str(" ~ ");
+    //             }
+    //
+    //             for g in self.controller.consume_time(left)? {
+    //                 out.push_str(g.end_annotation());
+    //             }
+    //         }
+    //
+    //         if dur.as_float() > 0.0 {
+    //             out.push_str(format!("{}{}", note.text(), self.controller.current()?.left.as_lilypond()).as_str());
+    //         }
+    //
+    //         Ok(out)
+    //     } else {
+    //         out.push_str(format!("{}{}{}", note.text(), dur.as_lilypond(), note.annotations()).as_str());
+    //         for g in self.controller.consume_time(dur)? {
+    //             out.push_str(g.end_annotation());
+    //         }
+    //         Ok(out)
+    //     }
+    // }
+    //
+    // pub fn format_notes<N>(&mut self, notes: Vec<N>) -> Result<String, &'static str> 
+    //     where N: Note<D> + Clone + Serialize
+    // {
+    //     Ok(notes.into_iter()
+    //         .map(|n| self.format_note(n).unwrap_or(String::new()))
+    //         .collect::<Vec<String>>().join(" "))
+    // }
+
     fn advance_grouping(&mut self) -> Result<Vec<Box<Grouping<D>>>, &'static str> {
         let mut out = Vec::new();
         // Pop the current element off the stack. It will eventually be returned, so that the view
@@ -325,4 +392,86 @@ mod tests {
         assert_eq!(controller.stack[0].left, Duration(RatioDuration(1, 4)));
         assert_eq!(controller.stack[1].left, Duration(RatioDuration(1, 4)));
     }
+
+    // #[test]
+    // fn test_format_notes() {
+    //     let notes = initialize_notes();
+    //     let mut controller = initialize_controller();
+    //     let mut view = NotesView::new(
+    //         String::new(),
+    //         BTreeMap::new(),
+    //         &mut controller).unwrap();
+    //
+    //     assert_eq!(Ok(" %m. \n c4 ~ c4 d4 e4 |\n   %m. \n f4".to_string()), view.format_notes(notes));
+    // }
+    //
+    // #[test]
+    // fn test_format() {
+    //     let notes = Notes::new(initialize_notes());
+    //     let mut controller = initialize_controller();
+    //     let mut view = NotesView::new(
+    //         String::new(),
+    //         BTreeMap::new(),
+    //         &mut controller).unwrap();
+    //
+    //     assert_eq!(Ok(" %m. \n c4 ~ c4 d4 e4 |\n   %m. \n f4".to_string()), view.format(notes));
+    // }
+    //
+    // #[test]
+    // fn test_viewable_format() {
+    //     let notes = initialize_notes();
+    //     let mut controller = initialize_controller();
+    //     let mut view = NotesView::new(
+    //         "{{{ notes }}}".to_string(),
+    //         BTreeMap::new(),
+    //         &mut controller).unwrap();
+    //
+    //     // let ref mut v = view;
+    //     let out0 = Notes::new(vec![notes[0].clone()]).format(&mut view).unwrap();
+    //     let out1 = Notes::new(vec![notes[1].clone()]).format(&mut view).unwrap();
+    //
+    //     assert_eq!(" %m. \n c4 ~ c4".to_string(), out0);
+    //     assert_eq!("d4".to_string(), out1);
+    // }
+    //
+    // #[test]
+    // fn test_render_with_template() {
+    //     let notes = initialize_notes();
+    //     let mut controller = initialize_controller();
+    //     let mut data = BTreeMap::new();
+    //     data.insert("note".to_string(), serde_json::to_value(&notes[0].clone()).unwrap());
+    //     let view = NotesView::new(
+    //         "{{ note.text }}{{ ly note.duration }}".to_string(),
+    //         data,
+    //         &mut controller).unwrap();
+    //
+    //     view.render().unwrap();
+    //     assert_eq!("c2".to_string(), view.render().unwrap());
+    // }
+    //
+    // #[test]
+    // fn test_render_with_helpers() {
+    //     let notes = initialize_notes();
+    //     let mut controller = initialize_controller();
+    //     let mut data = BTreeMap::new();
+    //     let mut templates = BTreeMap::new();
+    //     templates.insert("start_group", "{{ note.text }}{{ note.duration.as_lilypond }}{{ note.start_annotation }}{{ tie }}");
+    //     templates.insert("continue_group", "{{ note.text }}{{ note.duration.as_lilypond }}{{ tie }}");
+    //     templates.insert("end_group", "{{ note.text }}{{ note.duration.as_lilypond }}");
+    //     templates.insert("solo_note", "{{ note.text }}{{ note.duration.as_lilypond }}{{ note.start_annotation }}");
+    //
+    //     let mut view = NotesView::new(
+    //         "{{ formatted_notes }}".to_string(),
+    //         data,
+    //         &mut controller).unwrap();
+    //
+    //     view.data.insert("note".to_string(), serde_json::to_value(&notes[0].clone()).unwrap());
+    //     view.data.insert("tie".to_string(), serde_json::to_value(" ~ ").unwrap());
+    //
+    //     let formatted_notes: String = view.format_note(notes[0].clone()).unwrap();
+    //     view.data.insert("formatted_notes".to_string(), serde_json::to_value(formatted_notes.clone()).unwrap());
+    //
+    //     view.render().unwrap();
+    //     assert_eq!(" %m. \n c4 ~ c4".to_string(), view.render().expect("Panic on view.render()"));
+    // }
 }
