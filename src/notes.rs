@@ -9,8 +9,6 @@ use serde::ser::SerializeStruct;
 pub trait Note<D> 
 where D: Durational
 {
-    /// Duration of the `Note` should be given as a ratio tuple. This is to facilitate working with
-    /// metrical divisions, including potential tuplets.
     fn duration(&self) -> Duration<D>;
 
     fn set_duration(&mut self, d: Duration<D>);
