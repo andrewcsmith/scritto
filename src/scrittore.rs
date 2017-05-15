@@ -108,49 +108,6 @@ impl NotesView
             hb: Self::init_handlebars(source)?
         };
 
-        // let format_note_helper = |h: &Helper, _: &Handlebars, rc: &mut RenderContext| -> Result<(), RenderError> {
-        //     match h.param(0).ok_or(RenderError::new("format_note expects 1 param"))?.value() {
-        //         &Value::Object(ref s) => {
-        //             let note: Box<Note<D>> = match s.get("pitch_type").unwrap() {
-        //                 &Value::String(ref x) if x.as_str() == "ETPitch" => {
-        //                     let note: SingleNote<ETPitch, D> = serde_json::from_value(Value::Object(s.clone()))
-        //                         .map_err(|e| RenderError::new(e.description()))?;
-        //                     Box::new(note)
-        //                 },
-        //                 _ => { return Err(RenderError::new("Not a known Pitch type")) }
-        //             };
-        //
-        //             let out = format!("{}{}", note.text(), note.duration().as_lilypond());
-        //             rc.writer.write(out.into_bytes().as_ref())?;
-        //         },
-        //         _ => { }
-        //     }
-        //
-        //     Ok(())
-        // };
-        //
-        // let ly_helper = |h: &Helper, _: &Handlebars, rc: &mut RenderContext| -> Result<(), RenderError> {
-        //     match h.param(0).unwrap().value() {
-        //         &Value::Object(ref s) => {
-        //             let dur_value = s.get("duration").ok_or(RenderError::new("Param 0 should implement Durational"))?;
-        //             let duration: Duration<RatioDuration> = serde_json::from_value(dur_value.clone()).unwrap();
-        //             let out = format!("{}", duration.as_lilypond());
-        //             rc.writer.write(out.into_bytes().as_ref())?;
-        //         },
-        //         &Value::Array(ref val) => {
-        //             let duration: Duration<D> = serde_json::from_value(Value::Array(val.clone()))
-        //                 .map_err(|e| RenderError::new(e.description()))?;
-        //             let out = format!("{}", duration.as_lilypond());
-        //             rc.writer.write(out.as_bytes().as_ref())?;
-        //         },
-        //         _ => { }
-        //     }
-        //     Ok(())
-        // };
-        //
-        // view.hb.register_helper("format_note", Box::new(format_note_helper));
-        // view.hb.register_helper("ly", Box::new(ly_helper));
-
         Ok(view)
     }
 
@@ -181,18 +138,6 @@ where D: 'a + Durational,
         self.render().map_err(|_| "Could not render")
     }
 }
-
-// impl<'a, D, P> View<D, Chord<P, D>> for ChordView
-// where D: 'a + Durational + Serialize,
-//       P: Pitch + Clone + Serialize,
-//       for<'de> D: Deserialize<'de>
-// {
-//     fn format<'b>(&'b mut self, input: &Chord<P, D>) -> Result<String, &'static str> {
-//         let in_val = serde_json::to_value(input).map_err(|e| "Could not parse chord into value")?;
-//         self.data.insert("chord".to_string(), in_val);
-//         self.render().map_err(|_| "Could not render")
-//     }
-// }
 
 impl<'a, D, N> View<D, Notes<N, D>> for NotesView
 where D: 'a + Durational,
