@@ -119,7 +119,6 @@ where D: 'a + Durational + Serialize,
     fn load_context(&mut self, input: &Self::Input) -> Result<(), &'static str> 
     {
         let in_val = serde_json::to_value(input).map_err(|e| "Could not parse note into value")?;
-        println!("{}", serde_json::to_string(&in_val).unwrap());
         self.context.insert("note".to_string(), in_val);
         Ok(())
     }
@@ -144,7 +143,6 @@ where D: 'a + Durational + Serialize,
 
     fn load_context(&mut self, input: &Self::Input) -> Result<(), &'static str> {
         let in_val = serde_json::to_value(input).map_err(|e| "Could not parse chord into value")?;
-        println!("{}", serde_json::to_string(&in_val).unwrap());
         self.context.insert("chord".to_string(), in_val);
         Ok(())
     }
@@ -168,7 +166,6 @@ where D: 'a + Durational + Serialize,
 
     fn load_context(&mut self, input: &Self::Input) -> Result<(), &'static str> {
         let in_val = serde_json::to_value(&input.data).map_err(|e| "Could not parse notes into value")?;
-        println!("{}", serde_json::to_string(&in_val).unwrap());
         self.context.insert("notes".to_string(), in_val);
         Ok(())
     }
