@@ -1,1 +1,1 @@
-{{ #each notes }} {{ text }}{{ ly_duration }} {{ /each }}
+{{ #each notes as |note|}} {{view_note note}} {{ /each }}

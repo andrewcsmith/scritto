@@ -163,13 +163,31 @@ where D: 'a + Durational + Serialize,
 
 impl<'a, D, N> View for NotesView<N, D>
 where D: 'a + Durational + Serialize,
-      N: Note<D> + Clone + Serialize,
-      for<'de> D: Deserialize<'de>
+      N: Note<D> + Clone + Serialize + Viewable<'a, D>,
+      for<'de> D: Deserialize<'de>,
+      for<'de> N: Deserialize<'de>
 {
     type Input = Notes<N, D>;
 
     fn new(source: Option<String>, context: BTreeMap<String, Value>) -> Result<Self, Box<Error>> {
-        let hb: Handlebars = Self::init_handlebars(source)?;
+        let mut hb: Handlebars = Self::init_handlebars(source)?;
+        hb.register_template_file("note", "templates/single_note.hbs")?;
+        let view_note_helper = |h: &Helper, _: &Handlebars, rc: &mut RenderContext| -> Result<(), RenderError> {
+            let viewable_json = h.param(0).map(|v| v.value())
+                .ok_or(RenderError::new("Could not get param"))?;
+            let note: N = serde_json::from_value(viewable_json.clone())
+                .map_err(|e| RenderError::new(e.description()))?;
+            let context: BTreeMap<String, Value> = serde_json::from_value(
+                rc.context().data().clone())
+                .map_err(|e| RenderError::new(e.description()))?;
+            let mut view = <N as Viewable<D>>::View::new(None, context).
+                map_err(|_| RenderError::new("Could not create view"))?;
+            let out = note.render(&mut view)
+                .map_err(|_| RenderError::new("Could not render"))?;
+            rc.writer.write(out.trim().as_bytes().as_ref())?;
+            Ok(())
+        };
+        hb.register_helper("view_note", Box::new(view_note_helper));
         let phantom = PhantomData;
         Ok(NotesView { context, hb, phantom })
     }
@@ -206,8 +224,9 @@ where D: 'a + Durational + Serialize,
 
 impl<'a, D, N> Viewable<'a, D> for Notes<N, D>
 where D: 'a + Durational + Serialize,
-      N: Note<D> + Clone + Serialize,
-      for<'de> D: Deserialize<'de>
+      N: Note<D> + Clone + Serialize + Viewable<'a, D>,
+      for<'de> D: Deserialize<'de>,
+      for<'de> N: Deserialize<'de>
 {
     type View = NotesView<N, D>;
 }
