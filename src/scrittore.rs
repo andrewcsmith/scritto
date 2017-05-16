@@ -12,6 +12,7 @@ use std::path::Path;
 use super::{Pitch, Durational, Note};
 use super::notes::{SingleNote, Chord};
 
+/// Homogeneous collection of Notes, implementing Viewable.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Notes<N>
 where N: Note
@@ -91,6 +92,12 @@ where D: 'a + Durational
     fn render<'b>(&self, view: &'b mut Self::View) -> Result<String, &'static str> 
     {
         view.render(self)
+    }
+
+    fn render_default<'b>(&self) -> Result<String, &'static str> 
+    {
+        Self::View::new(None, BTreeMap::new())
+            .map_err(|_| "Could not create default View")?.render(self)
     }
 }
 
@@ -262,7 +269,7 @@ mod tests {
     fn test_render_note_template() {
         let notes = initialize_notes();
         let context = BTreeMap::new();
-        let mut view = SingleNoteView::new(None, context).unwrap();
+        let mut view = View::new(None, context).unwrap();
         let out = notes[0].render(&mut view).unwrap();
         assert_eq!("c2\n", out);
     }
@@ -271,7 +278,7 @@ mod tests {
     fn test_render_notes_template() {
         let notes = Notes::new(initialize_notes());
         let context = BTreeMap::new();
-        let mut view = NotesView::new(None, context).unwrap();
+        let mut view = View::new(None, context).unwrap();
         let out = notes.render(&mut view).unwrap();
         assert_eq!(" c2  d4  e4  f4 \n", out);
     }
@@ -285,7 +292,7 @@ mod tests {
                                           RatioDuration(1, 2))
         ]);
         let context = BTreeMap::new();
-        let mut view = NotesView::new(None, context).unwrap();
+        let mut view = View::new(None, context).unwrap();
         let out = notes.render(&mut view).unwrap();
         assert_eq!(" < c  d >2  < e  f >2 \n", &out);
     }
@@ -293,9 +300,16 @@ mod tests {
     #[test]
     fn test_render_chord_template() {
         let chord: Chord<ETPitch, RatioDuration> = Chord::new(vec![ETPitch::new(60), ETPitch::new(62)], Duration(RatioDuration(1, 2)));
-        let mut view = ChordView::new(None, BTreeMap::new()).unwrap();
+        let mut view = View::new(None, BTreeMap::new()).unwrap();
         let out = chord.render(&mut view).unwrap();
         assert_eq!("< c  d >2\n", &out);
+    }
+
+    #[test]
+    fn test_render_default() {
+        let notes = initialize_notes();
+        let out = notes[0].render_default().unwrap();
+        assert_eq!("c2\n", &out);
     }
 }
 
