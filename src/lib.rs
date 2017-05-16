@@ -13,9 +13,6 @@ pub mod notes;
 pub mod sequenza;
 pub mod scrittore;
 
-use serde::{Serialize, Serializer};
-use serde::ser::{SerializeStruct, SerializeTupleStruct};
-
 use std::ops::{Add, Sub};
 use std::cmp::{PartialOrd, PartialEq, Ordering};
 
@@ -24,7 +21,7 @@ pub use sequenza::Grouping;
 
 /// Trait for something that can represent duration. In the future, it may be wise to avoid making
 /// the `new` function necessary to allow other potentials for duration.
-pub trait Durational: Sized + Copy + PartialEq {
+pub trait Durational: Copy + PartialEq {
     /// Returns a new Durational object. Probably should be axed.
     fn new(u32, u32) -> Self;
     fn as_ratio(&self) -> (u32, u32);
@@ -199,7 +196,7 @@ fn lcm(a: u32, b: u32) -> u32 {
 /// text. This includes 12-tone equal tempered pitches (which are provided) as well as rational
 /// pitches that take the form of the Helmholtz-Ellis accidentals as written in the Lilypond HE
 /// library created by Andrew C. Smith.
-pub trait Pitch {
+pub trait Pitch: Clone {
     /// translates the starting pitch to a note name of some sort, needed for the start of each
     /// `Note`.
     fn pitch(&self) -> String;

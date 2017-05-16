@@ -6,13 +6,8 @@ use super::{Duration, Durational, Pitch};
 use serde::{Serialize, Serializer};
 use serde::ser::SerializeStruct;
 
-pub trait Note<D> 
-where D: Durational
+pub trait Note
 {
-    fn duration(&self) -> Duration<D>;
-
-    fn set_duration(&mut self, d: Duration<D>);
-
     /// Text of the beginning of the note (excluding duration), which will be passed on to the
     /// given template. This appears at the start of the Note and is repeated as necessary
     /// following any ties.
@@ -30,43 +25,43 @@ where D: Durational
 #[derive(Clone, Copy, Debug, PartialEq, Deserialize)]
 pub struct ETPitch
 {
-    pub midi: u32
+pub midi: u32
 }
 
 impl Serialize for ETPitch
 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> 
-        where S: Serializer
-    {
-        let mut s = serializer.serialize_struct("ETPitch", 2)?;
-        s.serialize_field("midi", &self.midi)?;
-        s.serialize_field("ly", &self.pitch())?;
-        s.end()
-    }
+fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> 
+    where S: Serializer
+{
+    let mut s = serializer.serialize_struct("ETPitch", 2)?;
+    s.serialize_field("midi", &self.midi)?;
+    s.serialize_field("ly", &self.pitch())?;
+    s.end()
+}
 }
 
 static ET_SCALE: [&str; 12] = ["c", "csharp", "d", "eflat", "e", "f", "fsharp", "g", "gsharp", "a", "bflat", "b"];
 
 impl ETPitch {
-    pub fn new(midi: u32) -> Self {
-        ETPitch { midi }
-    }
+pub fn new(midi: u32) -> Self {
+    ETPitch { midi }
+}
 }
 
 impl Pitch for ETPitch {
-    fn pitch(&self) -> String {
-        ET_SCALE[self.midi as usize % 12].to_string()
-    }
+fn pitch(&self) -> String {
+    ET_SCALE[self.midi as usize % 12].to_string()
+}
 
-    fn pitch_type(&self) -> &'static str {
-        "ETPitch"
-    }
+fn pitch_type(&self) -> &'static str {
+    "ETPitch"
+}
 }
 
 impl From<u32> for ETPitch {
-    fn from(f: u32) -> ETPitch {
-        ETPitch::new(f)
-    }
+fn from(f: u32) -> ETPitch {
+    ETPitch::new(f)
+}
 }
 
 #[derive(Clone, Debug, PartialEq, Deserialize)]
@@ -87,17 +82,17 @@ where P: Pitch,
     }
 }
 
-impl<P, D> Note<D> for SingleNote<P, D> 
+impl<P, D> Note for SingleNote<P, D> 
 where P: Pitch,
       D: Durational
 {
-    fn duration(&self) -> Duration<D> {
-        self.duration
-    }
-
-    fn set_duration(&mut self, d: Duration<D>) {
-        self.duration = d
-    }
+    // fn duration(&self) -> Duration<D> {
+    //     self.duration
+    // }
+    //
+    // fn set_duration(&mut self, d: Duration<D>) {
+    //     self.duration = d
+    // }
 
     fn text(&self) -> String {
         self.pitch.pitch()
@@ -113,11 +108,11 @@ where P: Pitch + Serialize,
     {
         let mut s = serializer.serialize_struct("SingleNote", 6)?;
         s.serialize_field("text", &self.text())?;
-        s.serialize_field("ly_duration", &self.duration().as_lilypond())?;
+        s.serialize_field("ly_duration", &self.duration.as_lilypond())?;
         s.serialize_field("annotations", &self.annotations())?;
         s.serialize_field("pitch_type", &self.pitch.pitch_type())?;
         s.serialize_field("pitch", &self.pitch)?;
-        s.serialize_field("duration", &self.duration())?;
+        s.serialize_field("duration", &self.duration)?;
         s.end()
     }
 }
@@ -146,17 +141,17 @@ where P: Pitch,
     }
 }
 
-impl<P, D> Note<D> for Chord<P, D> 
+impl<P, D> Note for Chord<P, D> 
 where P: Pitch,
       D: Durational
 {
-    fn duration(&self) -> Duration<D> {
-        self.duration
-    }
-
-    fn set_duration(&mut self, d: Duration<D>) {
-        self.duration = d
-    }
+    // fn duration(&self) -> Duration<D> {
+    //     self.duration
+    // }
+    //
+    // fn set_duration(&mut self, d: Duration<D>) {
+    //     self.duration = d
+    // }
 
     fn text(&self) -> String {
         assert!(self.pitches.len() > 0);
@@ -183,11 +178,11 @@ where P: Pitch + Serialize,
     {
         let mut s = serializer.serialize_struct("Chord", 6)?;
         s.serialize_field("text", &self.text())?;
-        s.serialize_field("ly_duration", &self.duration().as_lilypond())?;
+        s.serialize_field("ly_duration", &self.duration.as_lilypond())?;
         s.serialize_field("annotations", &self.annotations())?;
         s.serialize_field("pitch_type", &self.pitches[0].pitch_type())?;
         s.serialize_field("pitches", &self.pitches)?;
-        s.serialize_field("duration", &self.duration())?;
+        s.serialize_field("duration", &self.duration)?;
         s.end()
     }
 }
@@ -196,7 +191,7 @@ where P: Pitch + Serialize,
 mod tests {
     use super::*;
     use super::super::{IntegerDuration};
-    use serde_test::{Token, assert_tokens, assert_ser_tokens};
+    use serde_test::{Token, assert_tokens};
 
     #[test]
     fn translates_midi_to_note_name() {

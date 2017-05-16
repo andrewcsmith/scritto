@@ -1,7 +1,7 @@
 //! Essentially, `scrittore` is a `View` module (in the Model-View-Controller paradigm) which
 //! is called by a Controller to render the collection of Notes.
 
-use handlebars::{Handlebars, Helper, RenderContext, TemplateError, RenderError};
+use handlebars::{Handlebars, Helper, RenderContext, RenderError};
 use serde_json::{self, Value};
 use serde::{Serialize, Deserialize};
 use std::collections::BTreeMap;
@@ -9,17 +9,14 @@ use std::marker::PhantomData;
 use std::error::Error;
 use std::path::Path;
 
-use super::{Pitch, Duration, Durational, IntegerDuration, RatioDuration, Note};
-use super::sequenza::GroupingController;
-use super::notes::{ETPitch, SingleNote, Chord};
+use super::{Pitch, Durational, Note};
+use super::notes::{SingleNote, Chord};
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct Notes<N, D>
-where N: Note<D>,
-      D: Durational
+pub struct Notes<N>
+where N: Note
 {
-    data: Vec<N>,
-    phantom: PhantomData<D>
+    data: Vec<N>
 }
 
 pub struct SingleNoteView<P, D>
@@ -52,6 +49,11 @@ pub trait View: Sized
 
     fn new(source: Option<String>, context: BTreeMap<String, Value>) -> Result<Self, Box<Error>>;
 
+    fn new_boxed_view(source: Option<String>, context: BTreeMap<String, Value>) -> Result<Box<Self>, Box<Error>> 
+    {
+        Self::new(source, context).map(|s| Box::new(s))
+    }
+
     fn hb(&self) -> &Handlebars;
     fn context(&self) -> &BTreeMap<String, Value>;
 
@@ -59,7 +61,7 @@ pub trait View: Sized
 
     fn render<'b>(&'b mut self, input: &Self::Input) -> Result<String, &'static str> 
     {
-        self.load_context(input);
+        self.load_context(input)?;
         self.hb().render("template", &self.context()).map_err(|_| "Could not render")
     }
 
@@ -81,7 +83,7 @@ pub trait View: Sized
 /// `Viewable` sets up a given context allowing for a single element to be rendered. An object will
 /// receive a given `View`, and by convention insert itself into the data structure of that `View`
 /// before rendering.
-pub trait Viewable<'a, D>: Sized 
+pub trait Viewable<'a, D>: Sized
 where D: 'a + Durational
 {
     type View: View<Input=Self>;
@@ -92,14 +94,12 @@ where D: 'a + Durational
     }
 }
 
-impl<N, D> Notes<N, D> 
-where N: Note<D>,
-      D: Durational
+impl<N> Notes<N> 
+where N: Note
 {
     pub fn new(notes: Vec<N>) -> Self {
         Notes {
             data: notes,
-            phantom: PhantomData
         }
     }
 }
@@ -123,7 +123,7 @@ where D: 'a + Durational + Serialize,
 
     fn load_context(&mut self, input: &Self::Input) -> Result<(), &'static str> 
     {
-        let in_val = serde_json::to_value(input).map_err(|e| "Could not parse note into value")?;
+        let in_val = serde_json::to_value(input).map_err(|_| "Could not parse note into value")?;
         self.context.insert("note".to_string(), in_val);
         Ok(())
     }
@@ -151,7 +151,7 @@ where D: 'a + Durational + Serialize,
     fn context(&self) -> &BTreeMap<String, Value> { &self.context }
 
     fn load_context(&mut self, input: &Self::Input) -> Result<(), &'static str> {
-        let in_val = serde_json::to_value(input).map_err(|e| "Could not parse chord into value")?;
+        let in_val = serde_json::to_value(input).map_err(|_| "Could not parse chord into value")?;
         self.context.insert("chord".to_string(), in_val);
         Ok(())
     }
@@ -163,11 +163,11 @@ where D: 'a + Durational + Serialize,
 
 impl<'a, D, N> View for NotesView<N, D>
 where D: 'a + Durational + Serialize,
-      N: Note<D> + Clone + Serialize + Viewable<'a, D>,
+      N: Note + Clone + Serialize + Viewable<'a, D>,
       for<'de> D: Deserialize<'de>,
       for<'de> N: Deserialize<'de>
 {
-    type Input = Notes<N, D>;
+    type Input = Notes<N>;
 
     fn new(source: Option<String>, context: BTreeMap<String, Value>) -> Result<Self, Box<Error>> {
         let mut hb: Handlebars = Self::init_handlebars(source)?;
@@ -180,8 +180,8 @@ where D: 'a + Durational + Serialize,
             let context: BTreeMap<String, Value> = serde_json::from_value(
                 rc.context().data().clone())
                 .map_err(|e| RenderError::new(e.description()))?;
-            let mut view = <N as Viewable<D>>::View::new(None, context).
-                map_err(|_| RenderError::new("Could not create view"))?;
+            let mut view = <N as Viewable<D>>::View::new(None, context)
+                .map_err(|_| RenderError::new("Could not create view"))?;
             let out = note.render(&mut view)
                 .map_err(|_| RenderError::new("Could not render"))?;
             rc.writer.write(out.trim().as_bytes().as_ref())?;
@@ -196,7 +196,7 @@ where D: 'a + Durational + Serialize,
     fn context(&self) -> &BTreeMap<String, Value> { &self.context }
 
     fn load_context(&mut self, input: &Self::Input) -> Result<(), &'static str> {
-        let in_val = serde_json::to_value(&input.data).map_err(|e| "Could not parse notes into value")?;
+        let in_val = serde_json::to_value(&input.data).map_err(|_| "Could not parse notes into value")?;
         self.context.insert("notes".to_string(), in_val);
         Ok(())
     }
@@ -222,9 +222,9 @@ where D: 'a + Durational + Serialize,
     type View = ChordView<P, D>;
 }
 
-impl<'a, D, N> Viewable<'a, D> for Notes<N, D>
+impl<'a, D, N> Viewable<'a, D> for Notes<N>
 where D: 'a + Durational + Serialize,
-      N: Note<D> + Clone + Serialize + Viewable<'a, D>,
+      N: Note + Clone + Serialize + Viewable<'a, D>,
       for<'de> D: Deserialize<'de>,
       for<'de> N: Deserialize<'de>
 {
@@ -236,7 +236,6 @@ mod tests {
     use super::*;
     use super::super::*;
     use super::super::notes::*;
-    use super::super::sequenza::{Measure, Beat};
     
     fn initialize_notes() -> Vec<SingleNote<ETPitch, RatioDuration>> {
         vec![
@@ -262,7 +261,7 @@ mod tests {
     #[test]
     fn test_render_note_template() {
         let notes = initialize_notes();
-        let mut context = BTreeMap::new();
+        let context = BTreeMap::new();
         let mut view = SingleNoteView::new(None, context).unwrap();
         let out = notes[0].render(&mut view).unwrap();
         assert_eq!("c2\n", out);
@@ -271,7 +270,7 @@ mod tests {
     #[test]
     fn test_render_notes_template() {
         let notes = Notes::new(initialize_notes());
-        let mut context = BTreeMap::new();
+        let context = BTreeMap::new();
         let mut view = NotesView::new(None, context).unwrap();
         let out = notes.render(&mut view).unwrap();
         assert_eq!(" c2  d4  e4  f4 \n", out);
@@ -285,7 +284,7 @@ mod tests {
                                Chord::new(vec![ETPitch::new(64), ETPitch::new(65)], 
                                           RatioDuration(1, 2))
         ]);
-        let mut context = BTreeMap::new();
+        let context = BTreeMap::new();
         let mut view = NotesView::new(None, context).unwrap();
         let out = notes.render(&mut view).unwrap();
         assert_eq!(" < c  d >2  < e  f >2 \n", &out);
