@@ -184,12 +184,7 @@ where D: 'a + Durational + Serialize,
                 .ok_or(RenderError::new("Could not get param"))?;
             let note: N = serde_json::from_value(viewable_json.clone())
                 .map_err(|e| RenderError::new(e.description()))?;
-            let context: BTreeMap<String, Value> = serde_json::from_value(
-                rc.context().data().clone())
-                .map_err(|e| RenderError::new(e.description()))?;
-            let mut view = <N as Viewable<D>>::View::new(None, context)
-                .map_err(|_| RenderError::new("Could not create view"))?;
-            let out = note.render(&mut view)
+            let out = note.render_default()
                 .map_err(|_| RenderError::new("Could not render"))?;
             rc.writer.write(out.trim().as_bytes().as_ref())?;
             Ok(())
