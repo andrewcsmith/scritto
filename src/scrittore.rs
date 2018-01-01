@@ -208,21 +208,20 @@ where D: 'a + Durational + Serialize,
     }
 }
 
-impl<'a, P, D> Viewable<'a, D> for SingleNote<P, D>
-where D: 'a + Durational + Serialize,
-      P: Pitch + Clone + Serialize,
-      for<'de> D: Deserialize<'de>
-{
-    type View = SingleNoteView<P, D>;
+macro_rules! viewable {
+    ($item:tt, $view:tt) => {
+        impl<'a, P, D> Viewable<'a, D> for $item<P, D>
+        where D: 'a + Durational + Serialize,
+            P: Pitch + Clone + Serialize,
+            for<'de> D: Deserialize<'de>
+        {
+            type View = $view<P, D>;
+        }
+    };
 }
 
-impl<'a, P, D> Viewable<'a, D> for Chord<P, D>
-where D: 'a + Durational + Serialize,
-      P: Pitch + Clone + Serialize,
-      for<'de> D: Deserialize<'de>
-{
-    type View = ChordView<P, D>;
-}
+viewable!(SingleNote, SingleNoteView);
+viewable!(Chord, ChordView);
 
 impl<'a, D, N> Viewable<'a, D> for Notes<N>
 where D: 'a + Durational + Serialize,
