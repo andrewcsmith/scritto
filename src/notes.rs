@@ -25,37 +25,37 @@ pub trait Note
 #[derive(Clone, Copy, Debug, PartialEq, Deserialize)]
 pub struct ETPitch
 {
-pub midi: u32
+    pub midi: u32
 }
 
 impl Serialize for ETPitch
 {
-fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> 
-    where S: Serializer
-{
-    let mut s = serializer.serialize_struct("ETPitch", 2)?;
-    s.serialize_field("midi", &self.midi)?;
-    s.serialize_field("ly", &self.pitch())?;
-    s.end()
-}
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> 
+        where S: Serializer
+    {
+        let mut s = serializer.serialize_struct("ETPitch", 2)?;
+        s.serialize_field("midi", &self.midi)?;
+        s.serialize_field("ly", &self.pitch())?;
+        s.end()
+    }
 }
 
 static ET_SCALE: [&str; 12] = ["c", "csharp", "d", "eflat", "e", "f", "fsharp", "g", "gsharp", "a", "bflat", "b"];
 
 impl ETPitch {
-pub fn new(midi: u32) -> Self {
-    ETPitch { midi }
-}
+    pub fn new(midi: u32) -> Self {
+        ETPitch { midi }
+    }
 }
 
 impl Pitch for ETPitch {
-fn pitch(&self) -> String {
-    ET_SCALE[self.midi as usize % 12].to_string()
-}
+    fn pitch(&self) -> String {
+        ET_SCALE[self.midi as usize % 12].to_string()
+    }
 
-fn pitch_type(&self) -> &'static str {
-    "ETPitch"
-}
+    fn pitch_type(&self) -> &'static str {
+        "ETPitch"
+    }
 }
 
 impl From<u32> for ETPitch {
