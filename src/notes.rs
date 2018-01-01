@@ -86,14 +86,6 @@ impl<P, D> Note for SingleNote<P, D>
 where P: Pitch,
       D: Durational
 {
-    // fn duration(&self) -> Duration<D> {
-    //     self.duration
-    // }
-    //
-    // fn set_duration(&mut self, d: Duration<D>) {
-    //     self.duration = d
-    // }
-
     fn text(&self) -> String {
         self.pitch.pitch()
     }
@@ -145,14 +137,6 @@ impl<P, D> Note for Chord<P, D>
 where P: Pitch,
       D: Durational
 {
-    // fn duration(&self) -> Duration<D> {
-    //     self.duration
-    // }
-    //
-    // fn set_duration(&mut self, d: Duration<D>) {
-    //     self.duration = d
-    // }
-
     fn text(&self) -> String {
         assert!(self.pitches.len() > 0);
         let mut out = String::with_capacity(self.pitches.len() * 2 + 1);
